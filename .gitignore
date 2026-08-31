@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+*/.next/
+out/
+*/out/
+build/
+*/build/
+
+# Move build artifacts
+build/
+*/build/
+.temp/
+*/.temp/
+
+# Environment files
+.env
+.env*.local
+*.local
+
+# Logs and OS
+*.log
+.DS_Store
+Thumbs.db
+.vercel

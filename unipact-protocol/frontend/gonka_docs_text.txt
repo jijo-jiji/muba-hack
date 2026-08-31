@@ -1,0 +1,694 @@
+Title: Live Content
+Description: Fetched live
+Source: https://gonkarouter.io/docs
+---
+Developer Documentation | GonkaRouter
+GonkaRouter
+Features
+Models
+Docs
+Blog
+Feedback
+Sign In
+Get API Keys
+Back to Home
+Developer Quickstart
+Integration Guide
+Drop your GonkaRouter key into Claude SDKs, Cursor IDE, OpenClaw, or WorkBuddy in under five minutes. Every snippet in this guide is tested end-to-end against
+https://api.gonkarouter.io
+.
+1
+Get your API Key
+Open the
+Dashboard
+, sign in with email or Google.
+Click
+Create API Key
+, give it a label, copy the value.
+New accounts get
+a one-time $20 free credit
+, so you can try every model before topping up.
+Open Dashboard
+Browse Models
+Base URL
+https://api.gonkarouter.io
+Auth headers
+x-api-key OR Authorization: Bearer
+2
+30-second smoke test
+Before wiring up an SDK, run the snippet below in a terminal — pick your OS tab and substitute your real key. If you get back a
+200
+with a
+content[].text
+field, every other example on this page will work too.
+On Windows, pick the
+Windows (cmd)
+tab and run it in the Command Prompt (
+cmd
+) —
+curl.exe
+ships with Windows 10 and later, so no extra install is needed.
+smoke-test.sh
+macOS / Linux
+Windows (cmd)
+Copy
+KEY="sk-xxxxxx"   # paste your real key here
+curl -s https://api.gonkarouter.io/v1/messages \
+-H "x-api-key: $KEY" \
+-H "anthropic-version: 2023-06-01" \
+-H "content-type: application/json" \
+-d '{
+"model": "moonshotai/Kimi-K2.6",
+"max_tokens": 1024,
+"messages": [{"role":"user","content":"Reply with just: pong"}]
+}'
+Expected output (abridged)
+{
+"id": "msg_…",
+"type": "message",
+"role": "assistant",
+"model": "moonshotai/Kimi-K2.6",
+"content": [{"type":"text","text":" pong"}],
+"stop_reason": "end_turn",
+"usage": {"input_tokens":15,"output_tokens":43}
+}
+3
+Wire it into your client
+Claude SDK
+Cursor IDE
+Claude Code
+OpenClaw
+WorkBuddy
+Claude / Anthropic SDK
+GonkaRouter implements
+POST /v1/messages
+with the full Anthropic Messages API surface (streaming + tool use included). Point an official Anthropic SDK at the gateway by overriding
+base_url
+and
+api_key
+.
+Endpoint
+https://api.gonkarouter.io/v1/messages
+Recommended Model
+MiniMaxAI/MiniMax-M2.7
+1. Install the SDK
+install.sh
+Copy
+# Python
+pip install "anthropic>=0.40"
+# Node / TypeScript
+npm install @anthropic-ai/sdk
+2. Python — one-shot (tested ✓)
+claude_oneshot.py
+Copy
+from anthropic import Anthropic
+client = Anthropic(
+base_url="https://api.gonkarouter.io",
+api_key="sk-xxxxxx",  # your GonkaRouter key
+)
+msg = client.messages.create(
+model="moonshotai/Kimi-K2.6",
+max_tokens=1024,             # keep ≥ 1024 — see "reasoning tokens" note below
+messages=[
+{"role": "user", "content": "Reply with just: pong"},
+],
+)
+# content is a list of blocks; grab the first text block.
+text = next((b.text for b in msg.content if getattr(b, "text", None)), "")
+print(text)                       # -> "pong"
+print(msg.usage)                  # -> input_tokens=…, output_tokens=…
+3. Python — streaming (tested ✓)
+claude_stream.py
+Copy
+from anthropic import Anthropic
+client = Anthropic(
+base_url="https://api.gonkarouter.io",
+api_key="sk-xxxxxx",
+)
+# Idiomatic Anthropic streaming — text_stream yields each token chunk as a string.
+with client.messages.stream(
+model="moonshotai/Kimi-K2.6",
+max_tokens=1024,
+messages=[{"role": "user", "content": "Say hello in exactly three words."}],
+) as stream:
+for chunk in stream.text_stream:
+print(chunk, end="", flush=True)
+final = stream.get_final_message()
+print()
+print("usage:", final.usage)
+4. TypeScript / Node
+claude.ts
+Copy
+import Anthropic from "@anthropic-ai/sdk";
+const client = new Anthropic({
+baseURL: "https://api.gonkarouter.io",
+apiKey: process.env.GONKA_API_KEY!,   // sk-xxxxxx
+});
+// One-shot
+const msg = await client.messages.create({
+model: "moonshotai/Kimi-K2.6",
+max_tokens: 1024,
+messages: [{ role: "user", content: "Reply with just: pong" }],
+});
+const text = msg.content
+.filter((b): b is Anthropic.TextBlock => b.type === "text")
+.map((b) => b.text)
+.join("");
+console.log(text);
+// Streaming — idiomatic helper
+const stream = client.messages.stream({
+model: "moonshotai/Kimi-K2.6",
+max_tokens: 1024,
+messages: [{ role: "user", content: "Say hello in three words." }],
+});
+for await (const chunk of stream) {
+if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+process.stdout.write(chunk.delta.text);
+}
+}
+const finalMsg = await stream.finalMessage();
+console.log("\nusage:", finalMsg.usage);
+5. Raw curl reference
+messages.sh
+macOS / Linux
+Windows (cmd)
+Copy
+curl https://api.gonkarouter.io/v1/messages \
+-H "x-api-key: sk-xxxxxx" \
+-H "anthropic-version: 2023-06-01" \
+-H "content-type: application/json" \
+-d '{
+"model": "moonshotai/Kimi-K2.6",
+"max_tokens": 1024,
+"messages": [
+{"role": "user", "content": "Hello!"}
+]
+}'
+# Streaming variant — add "stream": true to the JSON body and pipe to a parser.
+Cursor IDE
+Cursor speaks the OpenAI Chat Completions API. GonkaRouter exposes
+POST /v1/chat/completions
+one-to-one with OpenAI, so you can register it as a custom provider and use Gonka models from Chat, Composer, and Cmd-K inline edits.
+Heads up — Cursor Free Plan won't route to your gateway
+As of late 2025,
+Cursor Free
+blocks
+Named Models
+: even if you configure Custom Base URL + API key + a custom model name correctly, Cursor pops up
+"Named models unavailable. Free plans can only use Auto."
+and silently routes the request to its own Auto provider — your gateway is never called. The steps below work
+only on Cursor Pro
+. On the Free tier, use a free OpenAI-compatible client instead: e.g.
+Continue.dev
+,
+Cline
+, or
+Aider
+— they accept the same Base URL + key with no plan gating.
+OpenAI Base URL (Cursor field)
+https://api.gonkarouter.io/v1
+API Key field
+paste your sk-… key
+Step-by-step (Cursor ≥ 0.42)
+01
+Open
+Cursor → Settings
+(
+⌘ ,
+on macOS,
+Ctrl ,
+on Windows/Linux), then go to the
+Models
+tab.
+02
+Scroll to
+OpenAI API Key
+. Click
+Override OpenAI Base URL
+and paste
+https://api.gonkarouter.io/v1
+.
+03
+Paste your GonkaRouter key into the
+OpenAI API Key
+field and click
+Verify
+. You should see a green check within a second.
+04
+In the same
+Models
+section, click
++ Add model
+and enter the model id
+exactly
+as it appears on
+/models
+(case- and slash-sensitive). Repeat per model.
+05
+Turn off
+any built-in Anthropic / OpenAI models you do not want Cursor to call through your key — otherwise Cursor may try to verify
+gpt-4o
+against the gateway and fail.
+06
+Open the Chat panel (
+⌘ L
+), pick your new model from the dropdown, ask
+"Reply pong"
+. Done.
+exact-values-to-paste.txt
+Copy
+# Paste these EXACT values into Cursor → Settings → Models
+OpenAI Base URL:  https://api.gonkarouter.io/v1
+OpenAI API Key:   sk-xxxxxx          # your GonkaRouter key
+Model name #1:    moonshotai/Kimi-K2.6
+# Optional Settings → Models → Advanced
+Max output tokens: 4096               # protects against reasoning-token starvation
+Cursor-specific tips
+Cursor sends standard OpenAI Chat Completions — no reasoning toggle, no Anthropic headers required.
+Custom models inherit Cursor's default temperature and tool-use behaviour. If a model emits a long
+reasoning
+field that fills the response, raise
+Max output tokens
+in
+Settings → Models → Advanced
+to ≥ 1024.
+If "Verify" fails: paste the smoke-test curl from Step 2 into a terminal first. If curl works but Cursor doesn't, you have a Base URL typo (most common: forgetting the
+/v1
+suffix).
+Claude Code CLI (Anthropic official)
+Anthropic's official
+@anthropic-ai/claude-code
+CLI honours
+ANTHROPIC_BASE_URL
+and
+ANTHROPIC_AUTH_TOKEN
+— so you can point it at GonkaRouter with a few env vars and use the full agentic workflow (file edits, tool calls, slash commands) backed by Gonka models.
+ANTHROPIC_BASE_URL
+https://api.gonkarouter.io
+ANTHROPIC_AUTH_TOKEN
+your sk-… key
+1. Install Claude Code
+install.sh
+Copy
+npm install -g @anthropic-ai/claude-code
+claude --version    # → 1.x.x
+2. Launch with an isolated HOME (recommended)
+run-claude.sh
+macOS / Linux
+Windows (cmd)
+Copy
+# 1. Create an isolated HOME so Claude Code does NOT pick up your existing
+#    ~/.claude/credentials OAuth session and silently ignore the env vars below.
+mkdir -p /tmp/gonka-claude-home
+# 2. Launch inside your project directory. Every env var matters — see below.
+HOME=/tmp/gonka-claude-home \
+ANTHROPIC_BASE_URL=https://api.gonkarouter.io \
+ANTHROPIC_AUTH_TOKEN=sk-xxxxxx \
+ANTHROPIC_MODEL=moonshotai/Kimi-K2.6 \
+ANTHROPIC_SMALL_FAST_MODEL=moonshotai/Kimi-K2.6 \
+DISABLE_PROMPT_CACHING=1 \
+claude
+Use this exact incantation when you want Claude Code to route
+cleanly through GonkaRouter
+without touching your existing Anthropic OAuth session.
+Only if you prefer PowerShell — "running scripts is disabled on this system"
+The cmd steps above run
+claude
+fine. But if you launch it from
+PowerShell
+instead, npm's
+claude.ps1
+is blocked by default (
+Restricted
+execution policy). Run this
+once
+to allow local scripts for your own user:
+allow-scripts.ps1
+Copy
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+# answer Y when prompted. (In cmd you don't need this at all.)
+What each env var does
+HOME=/tmp/gonka-claude-home
+—
+isolates the credentials store.
+Without this, Claude Code reads
+~/.claude/credentials
+, finds your existing OAuth session for Anthropic.com, and silently ignores
+ANTHROPIC_AUTH_TOKEN
+. The throwaway HOME forces it to fall back to the env-var path.
+ANTHROPIC_BASE_URL
+— domain root, no
+/v1
+suffix. The CLI appends
+/v1/messages
+itself.
+ANTHROPIC_AUTH_TOKEN
+— your GonkaRouter key. Sent as
+x-api-key
+. Note: it's
+_AUTH_TOKEN
+, not
+_API_KEY
+.
+ANTHROPIC_MODEL
+— primary model used for main reasoning. Pin to a Gonka model id (slashes preserved).
+ANTHROPIC_SMALL_FAST_MODEL
+— model used for sidecar tasks (file summaries, planner checks). Set it to the same Gonka model so every internal call still routes through your gateway.
+DISABLE_PROMPT_CACHING=1
+— the gateway does not implement Anthropic's prompt-caching headers; disable client caching to avoid
+cache_control
+requests that the gateway can't honour.
+3. (Optional) Wrap it in a shell function so you don't retype every time
+~/.zshrc (or ~/.bashrc)
+macOS / Linux
+Windows (cmd)
+Copy
+gonka-claude() {
+HOME=/tmp/gonka-claude-home \
+ANTHROPIC_BASE_URL=https://api.gonkarouter.io \
+ANTHROPIC_AUTH_TOKEN="${GONKA_API_KEY:?set GONKA_API_KEY in your shell}" \
+ANTHROPIC_MODEL=moonshotai/Kimi-K2.6 \
+ANTHROPIC_SMALL_FAST_MODEL=moonshotai/Kimi-K2.6 \
+DISABLE_PROMPT_CACHING=1 \
+claude "$@"
+}
+# then in any project: `gonka-claude`
+Gotchas
+Already logged into Anthropic?
+Without the isolated
+HOME
+the CLI will keep using OAuth and bill your Anthropic account instead. Verify routing by running
+/status
+inside the REPL — it should print
+https://api.gonkarouter.io
+as the base URL.
+Working directory state.
+The isolated HOME means a fresh session history every time. To keep history, replace
+/tmp/gonka-claude-home
+with a persistent path like
+~/.gonka-claude-home
+.
+Model id is case-sensitive.
+moonshotai/Kimi-K2.6
+works,
+Kimi-K2.6
+alone returns
+model not available for your channel
+.
+OpenClaw
+OpenClaw is a multi-provider agent platform with its own provider catalog — unlike Anthropic's Claude Code, it does
+not
+read
+ANTHROPIC_BASE_URL
+. You register GonkaRouter as a custom
+gonka
+provider in
+~/.openclaw/openclaw.json
+and use it via the
+anthropic-messages
+adapter. End-to-end tested against
+https://api.gonkarouter.io
+.
+Provider id
+gonka
+API adapter
+anthropic-messages
+1. Prerequisite — Node ≥ 22.12
+prereq.sh
+macOS / Linux
+Windows (cmd)
+Copy
+# OpenClaw requires Node.js ≥ 22.12 (LTS).
+# If you use nvm:
+nvm install 22
+nvm use 22
+nvm alias default 22
+node -v          # → v22.x.x
+OpenClaw requires Node 22 LTS. If
+node -v
+shows v20.x you'll get
+Node.js v22.12+ is required
+and the CLI refuses to start.
+2. Install OpenClaw
+install.sh
+Copy
+npm install -g openclaw
+openclaw --version   # → OpenClaw 2026.x.x
+3. Register the
+gonka
+provider
+gonka-provider.json5
+macOS / Linux
+Windows (cmd)
+Copy
+// Save as /tmp/gonka-provider.json5
+{
+models: {
+providers: {
+gonka: {
+baseUrl: "https://api.gonkarouter.io",
+apiKey: "sk-xxxxxx",              // your GonkaRouter key
+auth: "api-key",
+api: "anthropic-messages",
+models: [
+{ id: "moonshotai/Kimi-K2.6",                       name: "Kimi-K2.6" }
+]
+}
+}
+}
+}
+apply.sh
+macOS / Linux
+Windows (cmd)
+Copy
+# Dry-run validates the patch against the JSON schema:
+openclaw config patch --file /tmp/gonka-provider.json5 --dry-run
+# Apply for real:
+openclaw config patch --file /tmp/gonka-provider.json5
+# Confirm it landed (apiKey shows as __OPENCLAW_REDACTED__ — that's fine):
+openclaw config get models.providers.gonka
+The patch validates against OpenClaw's JSON schema before writing, and the previous config is auto-backed up to
+openclaw.json.bak
+. The API key is stored redacted in
+openclaw config get
+output.
+4. Start the Gateway daemon
+daemon.sh
+Copy
+openclaw config set gateway.mode local
+openclaw daemon restart
+# Verify the daemon came up cleanly:
+openclaw gateway status
+# → Runtime: running (pid …)
+# → Connectivity probe: ok
+# → Listening: 127.0.0.1:18789
+gateway.mode=local
+is required — without it the daemon exits with
+"Gateway start blocked: existing config is missing gateway.mode"
+.
+5. Three ways to use it
+run.sh
+macOS / Linux
+Windows (cmd)
+Copy
+# A. One-shot call (best for scripts / CI)
+openclaw infer model run \
+--model "gonka/moonshotai/Kimi-K2.6" \
+--prompt "Reply with just: pong" \
+--json
+# B. Interactive terminal UI
+openclaw chat --local
+# C. Web Dashboard
+openclaw            # opens http://127.0.0.1:18789/ with an auth-included URL
+All three modes resolve
+gonka/<model-id>
+against your registered provider. The Dashboard's
+Models
+panel lists the configured Gonka models in the picker — choose one and chat normally.
+Expected output of step 5's one-shot call
+{
+"ok": true,
+"capability": "model.run",
+"transport": "local",
+"provider": "gonka",
+"model": "moonshotai/Kimi-K2.6",
+"outputs": [{"text": "pong", "mediaUrl": null}]
+}
+Gotchas
+Model id is
+gonka/<real-id>
+.
+The prefix is the provider id you registered, not the underlying
+anthropic/
+path. Slashes inside the model id are part of the id and must be preserved verbatim (
+gonka/moonshotai/Kimi-K2.6
+).
+Daemon vs.
+--local
+.
+The
+--local
+flag bypasses the Gateway daemon and dials your provider directly from the CLI process — useful for one-off scripts and CI where you don't want a long-running daemon. Omit it and the daemon (port 18789) handles routing.
+Anthropic's own Claude Code CLI is different.
+The official
+@anthropic-ai/claude-code
+CLI
+does
+honour
+ANTHROPIC_BASE_URL
+/
+ANTHROPIC_AUTH_TOKEN
+. If that's what you meant by "OpenClaw", see the Claude SDK tab — the env-var pattern there applies to that CLI too.
+WorkBuddy
+WorkBuddy speaks the OpenAI Chat Completions API, so GonkaRouter plugs in as a
+Custom
+provider. Verified against WorkBuddy
+v5.3.11
+.
+Read this first — the endpoint field takes the full path
+Unlike every other client on this page, WorkBuddy's
+Interface URL
+field is the
+complete endpoint
+, not a base URL — it does
+not
+append
+/chat/completions
+for you. Paste the full path or the request lands on the wrong route and the model errors out with a bare
+404 page not found
+:
+✗
+https://api.gonkarouter.io
+→ posts to
+/
+→ 404
+✗
+https://api.gonkarouter.io/v1
+→ posts to
+/v1
+→ 404
+✓
+https://api.gonkarouter.io/v1/chat/completions
+Interface URL
+https://api.gonkarouter.io/v1/chat/completions
+API Key
+paste your sk-… key
+Step-by-step
+01
+Open
+Settings → Models
+and click
+Add Model
+.
+02
+Set
+Provider
+to
+Custom
+. The named entries in that dropdown (Kimi, MiniMax, Zhipu …) point at those vendors' own endpoints, not at your gateway.
+03
+Interface URL
+— paste
+https://api.gonkarouter.io/v1/chat/completions
+in full, as explained above.
+04
+API Key
+— paste your
+sk-…
+key from the Dashboard.
+05
+Model Name
+— the model id exactly as listed on
+Models
+, e.g.
+MiniMaxAI/MiniMax-M2.7
+or
+moonshotai/Kimi-K2.6
+. Case and slashes matter.
+06
+Under
+Advanced
+, tick the capabilities the model actually has — tool calling, image input, reasoning. These are independent capability switches, not a protocol picker, and none of them affect routing. Leave the context and output size fields blank to use provider defaults.
+07
+Save
+, start a new task, pick the model in the composer's model selector, and send a message.
+Verify the endpoint before blaming the client
+verify.sh
+Copy
+curl https://api.gonkarouter.io/v1/chat/completions \
+-H "Authorization: Bearer sk-xxxxxx" \
+-H "Content-Type: application/json" \
+-d '{
+"model": "MiniMaxAI/MiniMax-M2.7",
+"messages": [{"role": "user", "content": "ping"}]
+}'
+If this returns a completion but WorkBuddy still fails, the problem is in the client config — recheck step 03 first.
+Gotchas
+A 404 here is almost always the URL.
+404 page not found
+is the router's response to an unregistered path — it means the request reached us but the path was wrong. An invalid key returns
+401
+, and an unknown model returns
+400
+, so neither of those looks like a 404.
+Output is capped at 4096 tokens.
+Long agent turns get cut off with
+MAX_TOKENS
+. Omitting
+max_tokens
+yields an even lower default of 3072, and asking for more than 4096 is silently clamped back down, so the cap cannot be raised from the client. For reasoning models the thinking tokens count toward it too. Ask for shorter replies, or continue the turn after a truncation.
+Model ids differ per gateway plan.
+Vendor-prefixed ids like
+MiniMaxAI/MiniMax-M2.7
+and short ids like
+kimi-k2.6
+belong to different catalogs. Copy whatever the
+Models
+page shows for your key.
+Requests are relayed by WorkBuddy's own backend.
+Calls arrive via WorkBuddy's SaaS layer rather than straight from your machine, which is why its error reports carry two ids. When contacting support, quote the Trace ID from the error card.
+4
+Limits & Specifications
+Production-verified limits, last checked 2026-06-19. Subject to change as the upstream capacity scales — we update this section in place rather than rev a new endpoint.
+Rate Limits (global shared pool)
+Burst capacity:
+≥ 200 concurrent requests
+Sustainable throughput:
+≤ 1000 req/min
+Sustained
+> 1500 req/min
+will start returning
+429
+429
+responses
+do not consume your balance
+— back off 30–60s and retry
+Streaming Timeouts
+Hard cap:
+10 minutes
+wall-clock per request
+Idle cap:
+90 seconds
+— no new chunk in 90s closes the upstream connection
+Context Windows
+MiniMaxAI/MiniMax-M2.7
+200K tokens
+GonkaRouter
+AI Model Router on the Gonka Network
+[email protected]
+Menu
+Home
+Features
+Docs
+Blog
+Feedback
+Pricing
+Service
+Dashboard
+Chat
+Models
+Transactions
+Legal
+Privacy Policy
+Terms of Service
+Copyright 2026 GonkaRouter. Built for the Gonka Network.

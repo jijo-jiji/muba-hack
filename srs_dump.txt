@@ -1,0 +1,205 @@
+0: Software Requirements Specification (SRS)
+1: Project Name: UniPact Escrow Engine (AI-Audited Freelance Milestone & Settlement Protocol)
+2: Document Version: 1.0.0
+3: Target Competition: MUBA Hacks 2026 (Sui Track 01, Sui Track 02, Gonka Track)
+4: Submission Deadline: 5 September 2026, 11:59 PM MYT
+5: Demo / Pitch Date: 6 September 2026 at Asia Pacific University (APU)
+6: 1. Introduction
+7: 1.1 Purpose
+8: This document specifies the software architecture, functional requirements, smart contract interfaces, and user workflows for the UniPact Escrow Engine. The system provides trustless milestone escrow, automated proof-of-work auditing, and gasless stablecoin settlement for university students freelancing with small-to-medium enterprises (SMEs) and corporate partners.
+9: 1.2 Multi-Track Hackathon Alignment
+10: UniPact Escrow Engine qualifies for three tracks under a single repository submission:
+11: Sui Track 01 (Payments & Stablecoins): Zero-friction onboarding via zkLogin (Google auth), gasless payouts via Sponsored Transactions, and atomic $1 \rightarrow N$ payout routing using Programmable Transaction Blocks (PTBs) in testnet USDC.
+12: Sui Track 02 (AI × Sui): An autonomous execution copilot that translates unstructured milestone deliverables into valid Sui PTB execution blocks without manual blockchain configuration.
+13: Gonka Track (AI for Society): Impartial milestone verification using Gonka Router (gonkarouter.io). Cross-evaluates student deliverables against SME project specifications, outputting a Truth/Completion Score (0–100%), structured reasoning trace, and audit-verifiable Gonka Request IDs.
+14: 1.3 Scope & Boundaries
+15: Included: zkLogin authentication, client deposit escrow, student deliverable submission, Gonka Router multi-model audit pipeline, PTB fee splitting, and gas-sponsored transaction dispatch.
+16: Excluded: Fiat-to-crypto banking on-ramps, cross-chain bridges, and proprietary native mobile app distribution (delivered as a mobile-responsive Progressive Web Application).
+19: 3. Functional Requirements
+20: 3.1 Module 1: Authentication & Onboarding (zkLogin)
+21: FR-1.1 Session Initialization: On load, the client runtime generates an ephemeral Ed25519 keypair and creates a maximum-epoch expiration constraint.
+22: FR-1.2 OpenID Connect Authentication: The client redirects the user to Google OAuth 2.0 to retrieve a signed JSON Web Token (JWT).
+23: FR-1.3 Zero-Knowledge Proof Generation: The system passes the JWT, randomness salt, and ephemeral public key to a prover service, deriving the user's permanent Sui address without exposing their email on-chain.
+24: FR-1.4 Zero-Key Interaction: The user performs all signatures via the ephemeral private key stored in local session memory; no browser extension (e.g., Sui Wallet) is required.
+25: 3.2 Module 2: AI Milestone Audit Engine (Gonka Router Integration)
+26: FR-2.1 Input Data Ingestion: Ingests the SME’s initial milestone acceptance criteria and the student’s proof-of-work (GitHub PR link, Figma design link, live URL, and summary notes).
+27: FR-2.2 Dual-Model Gonka Routing: Dispatches parallel prompts to gonkarouter.io:
+28: Audit Call 1 (Scope Compliance): Evaluates whether the submission meets technical requirements and acceptance criteria.
+29: Audit Call 2 (Code/Content Quality): Flags placeholder code, broken links, direct template duplication, or missing core assets.
+30: FR-2.3 Verification Output Format: Returns a strictly formatted payload:
+31: Truth Score: Integer ($0 \le \text{Score} \le 100$).
+32: Reasoning Trace: Bulleted list of verified items and remaining deficiencies.
+33: Gonka Request ID: Canonical audit string returned by the Gonka Router (e.g., gnk-req-2026-unipact-4981).
+34: FR-2.4 Settlement Gate:
+35: If $\text{Score} \ge 80$, the UI automatically enables the "Authorize Audited Release" button.
+36: If $\text{Score} < 80$, the release button is locked, displaying actionable feedback from the reasoning trace to the student.
+37: 3.3 Module 3: Programmable Transaction Block (PTB) Builder
+38: FR-3.1 Payload Generation: Dynamically converts approved audit results into a Sui PTB containing:
+39: Verification score verification check.
+40: Protocol fee deduction ($10\%$ routed to UniPact Treasury).
+41: Milestone payout ($90\%$ routed to student zkLogin address).
+42: Recording of the Gonka Request ID inside the smart contract event log.
+43: FR-3.2 Atomic Guarantee: The PTB must execute atomically; any failure in fee routing or balance splits reverts the entire transaction.
+44: 3.4 Module 4: Gas Sponsoring Relayer
+45: FR-4.1 Gasless Execution: The user client generates the transaction kind bytes without specifying gas payment objects.
+46: FR-4.2 Sponsor Signing: The backend relayer (/api/sponsor) attaches a sponsor gas coin, signs the transaction as gas_payer, and returns the sponsor signature.
+47: FR-4.3 Dual-Sign Broadcast: The client appends the user's zkLogin signature and broadcasts the complete transaction via the Sui RPC node.
+48: 4. Smart Contract Specification (Sui Move)
+49: 4.1 Data Structure Definitions (sources/unipact_escrow.move)
+50: module unipact::escrow {
+51:     use sui::object::{Self, UID};
+52:     use sui::tx_context::{Self, TxContext};
+53:     use sui::coin::{Self, Coin};
+54:     use sui::transfer;
+55:     use sui::event;
+56:     use std::string::String;
+58:     // Error Codes
+59:     const EINVALID_CALLER: u64 = 100;
+60:     const ESCORE_TOO_LOW: u64 = 101;
+61:     const EINSUFFICIENT_FUNDS: u64 = 102;
+63:     public struct EscrowVault has key {
+64:         id: UID,
+65:         client: address,
+66:         student: address,
+67:         treasury: address,
+68:         total_locked: u64,
+69:         is_active: bool,
+70:     }
+72:     public struct MilestoneAuditedEvent has copy, drop {
+73:         escrow_id: address,
+74:         gonka_request_id: String,
+75:         truth_score: u8,
+76:         payout_amount: u64,
+77:         fee_amount: u64,
+78:         student: address,
+79:     }
+81:     /// Initializes a new project escrow
+82:     public entry fun create_escrow(
+83:         student: address,
+84:         treasury: address,
+85:         ctx: &mut TxContext
+86:     ) {
+87:         let vault = EscrowVault {
+88:             id: object::new(ctx),
+89:             client: tx_context::sender(ctx),
+90:             student,
+91:             treasury,
+92:             total_locked: 0,
+93:             is_active: true,
+94:         };
+95:         transfer::share_object(vault);
+96:     }
+98:     /// SME deposits milestone funds into the escrow
+99:     public entry fun deposit_milestone<T>(
+100:         vault: &mut EscrowVault,
+101:         deposit: Coin<T>,
+102:         ctx: &mut TxContext
+103:     ) {
+104:         assert!(vault.client == tx_context::sender(ctx), EINVALID_CALLER);
+105:         let amount = coin::value(&deposit);
+106:         vault.total_locked = vault.total_locked + amount;
+107:         transfer::public_transfer(deposit, object::uid_to_address(&vault.id));
+108:     }
+110:     /// Releases funds atomically upon passing Gonka AI audit
+111:     public entry fun release_audited_milestone<T>(
+112:         vault: &mut EscrowVault,
+113:         mut payment: Coin<T>,
+114:         gonka_request_id: String,
+115:         truth_score: u8,
+116:         ctx: &mut TxContext
+117:     ) {
+118:         // Enforce minimum AI verification threshold
+119:         assert!(truth_score >= 80, ESCORE_TOO_LOW);
+120:         assert!(vault.is_active, 103);
+122:         let total_val = coin::value(&payment);
+123:         assert!(total_val > 0, EINSUFFICIENT_FUNDS);
+125:         // Calculate 10% Protocol Fee / 90% Student Payout
+126:         let fee_amount = total_val / 10;
+127:         let student_amount = total_val - fee_amount;
+129:         let fee_coin = coin::split(&mut payment, fee_amount, ctx);
+130:         let student_coin = coin::split(&mut payment, student_amount, ctx);
+132:         transfer::public_transfer(fee_coin, vault.treasury);
+133:         transfer::public_transfer(student_coin, vault.student);
+135:         // Return remainder if any
+136:         transfer::public_transfer(payment, vault.client);
+138:         vault.is_active = false;
+140:         // Emit on-chain proof of Gonka verification
+141:         event::emit(MilestoneAuditedEvent {
+142:             escrow_id: object::uid_to_address(&vault.id),
+143:             gonka_request_id,
+144:             truth_score,
+145:             payout_amount: student_amount,
+146:             fee_amount,
+147:             student: vault.student,
+148:         });
+149:     }
+150: }
+152: 5. API & Integration Contracts
+153: 5.1 Gonka Router Audit Service (lib/gonka.ts)
+154: import OpenAI from "openai";
+156: const gonka = new OpenAI({
+157:   baseURL: "https://gonkarouter.io/v1", // Gonka Router API endpoint
+158:   apiKey: process.env.GONKA_ROUTER_API_KEY,
+159: });
+161: export interface MilestoneAuditResponse {
+162:   truthScore: number;
+163:   reasoningTrace: string[];
+164:   gonkaRequestId: string;
+165:   isApproved: boolean;
+166: }
+168: export async function auditDeliverable(
+169:   milestoneSpec: string,
+170:   submissionContent: string
+171: ): Promise<MilestoneAuditResponse> {
+172:   const response = await gonka.chat.completions.create({
+173:     model: "deepseek-v4-flash",
+174:     messages: [
+175:       {
+176:         role: "system",
+177:         content: `You are an impartial corporate project auditor. Compare the student submission against the agreed project specification. 
+178: Evaluate functional completeness, quality, and authenticity. Output ONLY raw JSON matching:
+179: {
+180:   "truth_score": number (0-100),
+181:   "reasoning": string[],
+182:   "approved": boolean
+183: }`
+184:       },
+185:       {
+186:         role: "user",
+187:         content: `SPECIFICATION:\n${milestoneSpec}\n\nSUBMISSION:\n${submissionContent}`
+188:       }
+189:     ],
+190:     response_format: { type: "json_object" }
+191:   });
+193:   const gonkaRequestId = response.id || `gnk-req-${Date.now()}`;
+194:   const data = JSON.parse(response.choices[0].message.content || "{}");
+196:   return {
+197:     truthScore: data.truth_score,
+198:     reasoningTrace: data.reasoning,
+199:     gonkaRequestId: gonkaRequestId,
+200:     isApproved: data.approved && data.truth_score >= 80,
+201:   };
+202: }
+209: 5.2 Sponsored PTB Construction (lib/suiPtb.ts) 
+211: import { Transaction } from "@mysten/sui/transactions";
+213: export function buildAuditedPayoutTx(
+214:   packageId: string,
+215:   vaultId: string,
+216:   usdcCoinId: string,
+217:   gonkaReqId: string,
+218:   truthScore: number
+219: ): Transaction {
+220:   const tx = new Transaction();
+222:   tx.moveCall({
+223:     target: `${packageId}::escrow::release_audited_milestone`,
+224:     typeArguments: ["0x2::sui::SUI"], // Swap with testnet USDC Coin Type
+225:     arguments: [
+226:       tx.object(vaultId),
+227:       tx.object(usdcCoinId),
+228:       tx.pure.string(gonkaReqId),
+229:       tx.pure.u8(truthScore),
+230:     ],
+231:   });
+233:   return tx;
+234: }
+247: 6. Frontend UI Wireframe Specifications 
