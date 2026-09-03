@@ -1,197 +1,53 @@
-import { GroupPool, Bill, TrustMeshJob } from "./types";
-import { INITIAL_PERSONAS } from "./zklogin";
+import { Job } from "./types";
 
-export const INITIAL_TRUSTMESH_JOBS: TrustMeshJob[] = [
+const DAY = 86_400_000;
+
+/**
+ * The jobs the demo starts with. Everything after this is created by whoever is
+ * using the app; nothing here is regenerated to fill an empty screen.
+ */
+export const SEED_JOBS: Job[] = [
   {
-    id: "job_hrms_leave_001",
-    title: "HRMS & Employee Leave Management System",
+    id: "job-hrms-leave",
+    title: "Employee leave request portal",
     description:
-      "Develop a modern employee leave request and approval portal with calendar overview, notification hooks, and secure department RBAC for an SME workforce of 50 staff.",
+      "We need a simple web portal where our 50 staff can request leave and managers can approve it. " +
+      "Calendar view of who is off, email notification when a request is approved, and separate views " +
+      "for staff and managers.",
     scope: "software_development",
-    softwareSubType: "HRMS",
-    techStack: ["Next.js", "TypeScript", "Tailwind CSS", "Sui Move"],
-    projectOutcome: "Working self-service employee leave portal with manager approval workflow and calendar sync.",
-    budgetUsdc: 300.0,
-    escrowVaultId: "0x_trustmesh_vault_hrms_300",
-    escrowStatus: "locked",
+    tags: ["Next.js", "TypeScript", "PostgreSQL"],
+    budgetUsdc: 300,
+    companyId: "apex",
     companyName: "Apex Retail Solutions Sdn Bhd",
-    companyEmail: "ops@apexretail.com.my",
-    companyVerification: "corporate_silent",
-    assignedStudent: {
-      id: INITIAL_PERSONAS[1].id,
-      name: INITIAL_PERSONAS[1].name,
-      email: INITIAL_PERSONAS[1].email,
-      address: INITIAL_PERSONAS[1].address,
-      university: "Asia Pacific University (APU)",
-      avatar: INITIAL_PERSONAS[1].avatar,
-    },
-    status: "in_progress",
-    clientAssets: [
-      {
-        id: "ca_1",
-        name: "Apex_Retail_HRMS_Requirements_Spec.pdf",
-        type: "brief",
-        sizeMb: 2.4,
-        url: "#",
-        uploadedAt: Date.now() - 86400000 * 3,
-      },
-      {
-        id: "ca_2",
-        name: "Brand_Design_System_Assets.zip",
-        type: "brand_asset",
-        sizeMb: 14.8,
-        url: "#",
-        uploadedAt: Date.now() - 86400000 * 3,
-      },
-      {
-        id: "ca_3",
-        name: "Employee_Org_Structure_Matrix.xlsx",
-        type: "document",
-        sizeMb: 1.1,
-        url: "#",
-        uploadedAt: Date.now() - 86400000 * 2,
-      },
-    ],
-    deliverables: [],
-    createdAt: Date.now() - 86400000 * 3,
-  },
-  {
-    id: "job_video_campaign_002",
-    title: "Campus Pop-Up Cafe Video Campaign & Short-Form Ads",
-    description:
-      "Edit 3 high-impact vertical video ads (9:16) from client-supplied raw 4K footage with motion captions, trending audio sync, and TikTok/Instagram Reels optimization.",
-    scope: "digital_marketing",
-    campaignObjective: "Achieve 50,000 organic video views and drive foot traffic to campus pop-up cafe launch.",
-    targetPlatforms: ["TikTok", "Instagram Reels", "YouTube Shorts"],
-    kpiTargets: "3 finished 30-sec videos + creative hooks + caption copy",
-    budgetUsdc: 180.0,
-    escrowVaultId: "0x_trustmesh_vault_video_180",
     escrowStatus: "locked",
-    companyName: "Daily Brew Artisan Cafe",
-    companyEmail: "marketing@dailybrew.my",
-    companyVerification: "ssm_verified",
-    assignedStudent: {
-      id: INITIAL_PERSONAS[2].id,
-      name: INITIAL_PERSONAS[2].name,
-      email: INITIAL_PERSONAS[2].email,
-      address: INITIAL_PERSONAS[2].address,
-      university: "Multimedia University (MMU)",
-      avatar: INITIAL_PERSONAS[2].avatar,
-    },
     status: "open",
+    applications: [],
     clientAssets: [
-      {
-        id: "ca_4",
-        name: "Raw_Barista_Latte_Art_4K_60fps.mp4",
-        type: "raw_video",
-        sizeMb: 68.5,
-        url: "#",
-        uploadedAt: Date.now() - 86400000,
-      },
-      {
-        id: "ca_5",
-        name: "Store_Interior_B_Roll_Footage.mp4",
-        type: "raw_video",
-        sizeMb: 42.1,
-        url: "#",
-        uploadedAt: Date.now() - 86400000,
-      },
-      {
-        id: "ca_6",
-        name: "Cafe_Brand_Guidelines_and_Soundtrack.pdf",
-        type: "brand_asset",
-        sizeMb: 3.5,
-        url: "#",
-        uploadedAt: Date.now() - 86400000,
-      },
+      { id: "asset-1", name: "Leave_policy_and_requirements.pdf", type: "brief", sizeMb: 2.4, uploadedAt: Date.now() - DAY * 3 },
+      { id: "asset-2", name: "Apex_brand_colours_and_logo.zip", type: "brand_asset", sizeMb: 14.8, uploadedAt: Date.now() - DAY * 3 },
+      { id: "asset-3", name: "Department_structure.xlsx", type: "document", sizeMb: 1.1, uploadedAt: Date.now() - DAY * 2 },
     ],
-    deliverables: [],
-    createdAt: Date.now() - 86400000,
+    createdAt: Date.now() - DAY * 3,
   },
-];
-
-export const INITIAL_GROUP_POOLS: GroupPool[] = [
   {
-    id: "pool_apu_hackers_01",
-    name: "APU Web3 Hackers & Project Team Tab",
-    creator: INITIAL_PERSONAS[0].address,
-    clubTreasury: INITIAL_PERSONAS[4].address,
-    clubFeeBps: 250,
-    totalExpenses: 284.5,
-    totalSettled: 194.5,
-    treasuryBalance: 6.8,
-    isActive: true,
-    members: [
-      {
-        address: INITIAL_PERSONAS[0].address,
-        name: INITIAL_PERSONAS[0].name,
-        avatar: INITIAL_PERSONAS[0].avatar,
-        netBalance: 120.0,
-      },
-      {
-        address: INITIAL_PERSONAS[1].address,
-        name: INITIAL_PERSONAS[1].name,
-        avatar: INITIAL_PERSONAS[1].avatar,
-        netBalance: -45.0,
-      },
-      {
-        address: INITIAL_PERSONAS[2].address,
-        name: INITIAL_PERSONAS[2].name,
-        avatar: INITIAL_PERSONAS[2].avatar,
-        netBalance: -75.0,
-      },
+    id: "job-cafe-video",
+    title: "Three short-form video ads for a cafe launch",
+    description:
+      "Edit three 30-second vertical videos from our raw footage for TikTok and Instagram Reels. " +
+      "We need captions, a hook in the first two seconds, and copy suggestions for each post.",
+    scope: "digital_marketing",
+    tags: ["TikTok", "Instagram Reels", "Video editing"],
+    budgetUsdc: 180,
+    companyId: "dailybrew",
+    companyName: "Daily Brew Artisan Cafe",
+    escrowStatus: "locked",
+    status: "open",
+    applications: [],
+    clientAssets: [
+      { id: "asset-4", name: "Barista_footage_4K.mp4", type: "raw_video", sizeMb: 68.5, uploadedAt: Date.now() - DAY },
+      { id: "asset-5", name: "Store_interior_b_roll.mp4", type: "raw_video", sizeMb: 42.1, uploadedAt: Date.now() - DAY },
+      { id: "asset-6", name: "Brand_guidelines.pdf", type: "brand_asset", sizeMb: 3.5, uploadedAt: Date.now() - DAY },
     ],
-    bills: [
-      {
-        id: "bill_mamak_dinner_001",
-        poolId: "pool_apu_hackers_01",
-        title: "Post-Hackathon Mamak Supper (Table #07)",
-        category: "Dining",
-        totalAmount: 60.0,
-        payerAddress: INITIAL_PERSONAS[0].address,
-        payerName: "Alice Tan",
-        memberCount: 3,
-        amountPerMember: 20.0,
-        clubDueAmount: 0.5,
-        repaidCount: 1,
-        isFullySettled: false,
-        createdAt: Date.now() - 3600 * 1000 * 2,
-        items: [
-          { id: "i1", name: "3x Nasi Lemak Ayam Goreng", price: 36.0, assignedTo: [INITIAL_PERSONAS[0].address, INITIAL_PERSONAS[1].address, INITIAL_PERSONAS[2].address] },
-          { id: "i2", name: "3x Teh Tarik Kaw", price: 12.0, assignedTo: [INITIAL_PERSONAS[0].address, INITIAL_PERSONAS[1].address, INITIAL_PERSONAS[2].address] },
-          { id: "i3", name: "2x Roti Canai Banjir", price: 12.0, assignedTo: [INITIAL_PERSONAS[0].address, INITIAL_PERSONAS[1].address, INITIAL_PERSONAS[2].address] },
-        ],
-        splitMembers: [
-          {
-            address: INITIAL_PERSONAS[0].address,
-            name: "Alice Tan (Payer)",
-            avatar: "👩🏻‍💻",
-            amount: 20.0,
-            dues: 0.5,
-            status: "paid",
-            paidTxDigest: "0x89f2...a41c",
-            paidAt: Date.now() - 7200000,
-          },
-          {
-            address: INITIAL_PERSONAS[1].address,
-            name: "Bob Lee",
-            avatar: "👨🏻‍🎓",
-            amount: 20.0,
-            dues: 0.5,
-            status: "pending",
-          },
-          {
-            address: INITIAL_PERSONAS[2].address,
-            name: "Charlie Wong",
-            avatar: "🧑🏽‍💻",
-            amount: 20.0,
-            dues: 0.5,
-            status: "paid",
-            paidTxDigest: "0x3e11...b902",
-            paidAt: Date.now() - 3600000,
-          },
-        ],
-      },
-    ],
+    createdAt: Date.now() - DAY,
   },
 ];

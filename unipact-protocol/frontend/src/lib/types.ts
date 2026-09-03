@@ -1,178 +1,94 @@
-import { Keypair } from "@mysten/sui/cryptography";
+/** The three kinds of people who use TrustMesh. */
+export type UserRole = "company" | "student" | "admin";
 
-export interface ZkLoginPersona {
+/**
+ * A demo account. Deliberately plain JSON so it can live in a cookie and travel
+ * between the server and the browser. Signing keys are never stored here; they
+ * are re-derived from the account id in lib/zklogin.ts.
+ */
+export interface Account {
   id: string;
   name: string;
   email: string;
+  role: UserRole;
   address: string;
-  avatar: string;
-  role: "student" | "payer" | "treasurer" | "merchant" | "company";
-  keypair: Keypair;
-  usdcBalance: number;
+  /** Company accounts only: the business posting the work. */
+  organisation?: string;
+  /** Student accounts only. */
   university?: string;
-  clubAffiliation?: string;
+  course?: string;
 }
 
 export type ProjectScope = "software_development" | "digital_marketing";
 
-export type SoftwareSubType = "Landing Page / Website" | "ERP" | "HRMS" | "CRM" | "Custom Automation Tool";
-
+/** A file the company shares with the student so they can do the work. */
 export interface ClientAsset {
   id: string;
   name: string;
-  type: "document" | "brand_asset" | "raw_video" | "brief";
+  type: "brief" | "document" | "brand_asset" | "raw_video";
   sizeMb: number;
-  url: string;
   uploadedAt: number;
 }
 
-export interface JobDeliverable {
-  id: string;
-  title: string;
-  type: "github_pr" | "live_demo" | "video_deliverable" | "documentation";
+/** What the student hands back when the work is done. */
+export interface Deliverable {
   link: string;
   summary: string;
   submittedAt: number;
 }
 
-export interface ProjectReport {
-  id: string;
-  jobId: string;
-  jobTitle: string;
-  scope: ProjectScope;
-  companyName: string;
+export interface JobApplication {
+  studentId: string;
   studentName: string;
-  studentAddress: string;
   university: string;
-  budgetUsdc: number;
-  studentPayoutUsdc: number;
-  platformFeeUsdc: number;
-  truthScore: number;
-  gonkaRequestId: string;
-  completedAt: string;
-  skillsApplied: string[];
-  outcomeSummary: string;
+  message: string;
+  appliedAt: number;
 }
 
-export interface TrustMeshJob {
+/**
+ * How far along a job is. It only ever moves forwards, and each step is taken by
+ * a different party, which is what the permission rules are built around.
+ */
+export type JobStatus =
+  | "open" // company funded it, students can apply
+  | "assigned" // company accepted a student
+  | "submitted" // student sent the work in
+  | "audited" // the AI review has run
+  | "paid"; // escrow released
+
+/** Money actually leaving escrow. */
+export interface PaymentRecord {
+  studentPayoutUsdc: number;
+  platformFeeUsdc: number;
+  releasedAt: number;
+  /** Set only when a real transaction was confirmed on Sui. */
+  digest?: string;
+  /** Set only alongside a real digest. */
+  explorerUrl?: string;
+  /** Says plainly what happened, including when nothing was broadcast. */
+  note: string;
+}
+
+export interface Job {
   id: string;
   title: string;
   description: string;
   scope: ProjectScope;
-  // Software Dev Specific
-  softwareSubType?: SoftwareSubType;
-  techStack?: string[];
-  projectOutcome?: string;
-  // Digital Marketing Specific
-  campaignObjective?: string;
-  targetPlatforms?: string[];
-  kpiTargets?: string;
-  // Financial & Escrow
+  /** Software jobs: the stack the company expects. Marketing jobs: the platforms. */
+  tags: string[];
   budgetUsdc: number;
-  escrowVaultId: string;
-  escrowStatus: "unfunded" | "locked" | "released" | "refunded";
-  // Company Info
+  companyId: string;
   companyName: string;
-  companyEmail: string;
-  companyVerification: "corporate_silent" | "ssm_verified" | "pending_ssm";
-  // Assignment
-  assignedStudent?: {
-    id: string;
-    name: string;
-    email: string;
-    address: string;
-    university: string;
-    avatar: string;
-  };
-  status: "open" | "matched" | "in_progress" | "audited" | "settled";
+  escrowStatus: "unfunded" | "locked" | "released";
+  status: JobStatus;
+  assignedStudentId?: string;
+  assignedStudentName?: string;
+  applications: JobApplication[];
   clientAssets: ClientAsset[];
-  deliverables: JobDeliverable[];
-  projectReport?: ProjectReport;
+  deliverable?: Deliverable;
+  audit?: MilestoneAuditResult;
+  payment?: PaymentRecord;
   createdAt: number;
-}
-
-export interface ItemizedEntry {
-  id: string;
-  name: string;
-  price: number;
-  assignedTo: string[]; // member addresses
-}
-
-export interface SplitMemberStatus {
-  address: string;
-  name: string;
-  avatar: string;
-  amount: number;
-  dues: number;
-  status: "pending" | "paid" | "disputed";
-  paidTxDigest?: string;
-  paidAt?: number;
-}
-
-export interface Bill {
-  id: string;
-  poolId: string;
-  title: string;
-  category: "Dining" | "Club Event" | "Hackathon Supplies" | "Campus Market" | "Travel";
-  totalAmount: number;
-  payerAddress: string;
-  payerName: string;
-  memberCount: number;
-  amountPerMember: number;
-  clubDueAmount: number;
-  repaidCount: number;
-  isFullySettled: boolean;
-  createdAt: number;
-  items?: ItemizedEntry[];
-  splitMembers: SplitMemberStatus[];
-}
-
-export interface GroupPool {
-  id: string;
-  name: string;
-  creator: string;
-  clubTreasury: string;
-  clubFeeBps: number; // e.g. 250 for 2.5%
-  totalExpenses: number;
-  totalSettled: number;
-  treasuryBalance: number;
-  isActive: boolean;
-  bills: Bill[];
-  members: {
-    address: string;
-    name: string;
-    avatar: string;
-    netBalance: number;
-  }[];
-}
-
-export interface MerchantQRPayload {
-  type: "merchant_pos" | "group_bill";
-  version: "1.0";
-  poolId?: string;
-  billId?: string;
-  merchantAddress: string;
-  merchantName: string;
-  title: string;
-  amount: number;
-  clubDues: number;
-  category: string;
-  expiresAt: number;
-  items?: { name: string; price: number; qty: number }[];
-}
-
-export interface PTBExecutionResult {
-  digest: string;
-  executionTimeMs: number;
-  gasSponsored: boolean;
-  sponsorAddress: string;
-  totalPaid: number;
-  payerAmount: number;
-  duesAmount: number;
-  status: "success" | "failed";
-  explorerUrl?: string;
-  billId?: string;
-  poolId?: string;
 }
 
 /**
@@ -182,6 +98,7 @@ export interface PTBExecutionResult {
 export type AuditSource = "live" | "demo_preset" | "keyword_fallback";
 
 export interface MilestoneAuditResult {
+  /** How closely the submitted work matches what was asked for, 0 to 100. */
   truthScore: number;
   reasoningTrace: string[];
   gonkaRequestId: string;
@@ -194,21 +111,23 @@ export interface MilestoneAuditResult {
   source: AuditSource;
 }
 
+/**
+ * Canned audit outcomes. They exist so a bad venue network cannot kill the live
+ * demo. Anything built from these is tagged isLiveGonkaCall: false and the UI
+ * labels it as demo data.
+ */
 export const DEMO_PRESETS = {
   VALID_DELIVERABLE: {
-    title: "Production ERP & HRMS Leave Module on Sui",
-    spec: "Develop a mobile-friendly automation portal integrating company authentication, employee leave requests, approval routing, and gasless audit settlements in testnet USDC.",
-    submission: "PR #18 merged to main branch. Implemented Move escrow smart contracts, Gonka Router verification, Sui PTB relayer signing, and client asset repository.",
     mockResult: {
       truthScore: 94,
       isApproved: true,
       scopeScore: 95,
       qualityScore: 92,
       reasoningTrace: [
-        "Verified full functional compliance with SME project specification.",
-        "Verified gasless PTB execution routing 90% to student and 10% to TrustMesh Treasury.",
-        "Verified client asset handling and confidential repository permissions.",
-        "Zero placeholder code or unfinished TODO comments detected.",
+        "Every feature listed in the brief is present and working.",
+        "The payment split matches the agreed 90/10 arrangement.",
+        "Client files were handled and referenced correctly.",
+        "No placeholder or unfinished code was found.",
       ],
       gonkaRequestId: "gnk-req-2026-trustmesh-pass",
       auditedAt: new Date().toISOString(),
@@ -217,18 +136,15 @@ export const DEMO_PRESETS = {
     },
   },
   INCOMPLETE_DELIVERABLE: {
-    title: "Incomplete / Placeholder Submission",
-    spec: "Implement complete milestone deliverable with end-to-end integration and asset verification.",
-    submission: "TODO: integrate smart contracts later. Added dummy UI placeholder.",
     mockResult: {
       truthScore: 42,
       isApproved: false,
       scopeScore: 40,
       qualityScore: 45,
       reasoningTrace: [
-        "Deficiency: Core milestone contracts and PTB execution blocks are missing.",
-        "Deficiency: Found placeholder TODO comments in code files.",
-        "Truth score below 80% threshold. Automated PTB release locked.",
+        "Core parts of the brief are missing from the submission.",
+        "Placeholder TODO comments were found in the submitted code.",
+        "Score is below 80, so the payment stays locked.",
       ],
       gonkaRequestId: "gnk-req-2026-trustmesh-reject",
       auditedAt: new Date().toISOString(),

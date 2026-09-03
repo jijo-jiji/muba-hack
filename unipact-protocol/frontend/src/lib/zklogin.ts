@@ -1,102 +1,96 @@
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { ZkLoginPersona } from "./types";
-import { fromBase64, toBase64 } from "@mysten/sui/utils";
+import { Account } from "./types";
 
-// Deterministic seed generation for consistent demo personas
-function createPersonaKeypair(seed: string): Ed25519Keypair {
-  const encoder = new TextEncoder();
-  const seedBytes = encoder.encode(seed.padEnd(32, "0")).slice(0, 32);
+/**
+ * Demo signing keys are derived from a fixed seed string, so every account keeps
+ * the same Sui address across reloads and across both browser windows in the demo.
+ *
+ * A production build would not do this. Real zkLogin derives the address from a
+ * Google ID token plus a fresh ephemeral keypair, and the token is verified on
+ * the server. See the honesty note in the app footer.
+ */
+function deriveKeypair(seed: string): Ed25519Keypair {
+  const seedBytes = new TextEncoder().encode(seed.padEnd(32, "0")).slice(0, 32);
   return Ed25519Keypair.fromSecretKey(seedBytes);
 }
 
-// Initial demo personas for zero-friction hackathon testing & role switching
-export const INITIAL_PERSONAS: ZkLoginPersona[] = [
+const SEEDS: Record<string, string> = {
+  apex: "trustmesh_company_apex_2026_0001",
+  dailybrew: "trustmesh_company_brew_2026_0002",
+  bob: "trustmesh_student_boblee_2026_003",
+  charlie: "trustmesh_student_charlie_2026_04",
+  nurul: "trustmesh_student_nurul_2026_0005",
+  admin: "trustmesh_platform_admin_2026_006",
+};
+
+/** The signing key for a demo account. Returns null for an unknown id. */
+export function getAccountKeypair(accountId: string): Ed25519Keypair | null {
+  const seed = SEEDS[accountId];
+  return seed ? deriveKeypair(seed) : null;
+}
+
+function addressOf(accountId: string): string {
+  return deriveKeypair(SEEDS[accountId]).toSuiAddress();
+}
+
+/** The accounts offered on the sign-in page. */
+export const DEMO_ACCOUNTS: Account[] = [
   {
-    id: "alice",
-    name: "Alice Tan (Group Leader)",
-    email: "alice.tan@apu.edu.my",
-    address: createPersonaKeypair("alice_zklogin_demo_seed_2026_01").toSuiAddress(),
-    avatar: "👩🏻‍💻",
-    role: "payer",
-    keypair: createPersonaKeypair("alice_zklogin_demo_seed_2026_01"),
-    usdcBalance: 250.0,
+    id: "apex",
+    name: "Priya Ramasamy",
+    email: "ops@apexretail.com.my",
+    role: "company",
+    address: addressOf("apex"),
+    organisation: "Apex Retail Solutions Sdn Bhd",
+  },
+  {
+    id: "dailybrew",
+    name: "Wei Ming Chong",
+    email: "marketing@dailybrew.my",
+    role: "company",
+    address: addressOf("dailybrew"),
+    organisation: "Daily Brew Artisan Cafe",
   },
   {
     id: "bob",
-    name: "Bob Lee (Student Member)",
+    name: "Bob Lee",
     email: "bob.lee@apu.edu.my",
-    address: createPersonaKeypair("bob_zklogin_demo_seed_2026_02").toSuiAddress(),
-    avatar: "👨🏻‍🎓",
     role: "student",
-    keypair: createPersonaKeypair("bob_zklogin_demo_seed_2026_02"),
-    usdcBalance: 85.0,
+    address: addressOf("bob"),
+    university: "Asia Pacific University",
+    course: "BSc Software Engineering",
   },
   {
     id: "charlie",
-    name: "Charlie Wong (Club Member)",
-    email: "charlie.w@apu.edu.my",
-    address: createPersonaKeypair("charlie_zklogin_demo_seed_2026_03").toSuiAddress(),
-    avatar: "🧑🏽‍💻",
+    name: "Charlie Wong",
+    email: "charlie.w@student.mmu.edu.my",
     role: "student",
-    keypair: createPersonaKeypair("charlie_zklogin_demo_seed_2026_03"),
-    usdcBalance: 120.0,
+    address: addressOf("charlie"),
+    university: "Multimedia University",
+    course: "BA Digital Media Production",
   },
   {
-    id: "merchant_dave",
-    name: "Dave's Campus Cafe (POS)",
-    email: "dave.cafe@campus-eats.my",
-    address: createPersonaKeypair("dave_merchant_pos_seed_2026_04").toSuiAddress(),
-    avatar: "☕",
-    role: "merchant",
-    keypair: createPersonaKeypair("dave_merchant_pos_seed_2026_04"),
-    usdcBalance: 520.0,
+    id: "nurul",
+    name: "Nurul Aisyah",
+    email: "nurul.aisyah@siswa.um.edu.my",
+    role: "student",
+    address: addressOf("nurul"),
+    university: "Universiti Malaya",
+    course: "BSc Computer Science",
   },
   {
-    id: "treasurer_eva",
-    name: "Blockchain Club Treasury",
-    email: "treasury@sui-club.apu.my",
-    address: "0x7777777777777777777777777777777777777777777777777777777777777777",
-    avatar: "🏛️",
-    role: "treasurer",
-    keypair: createPersonaKeypair("treasury_eva_seed_2026_05"),
-    usdcBalance: 1450.0,
+    id: "admin",
+    name: "TrustMesh Platform",
+    email: "admin@trustmesh.my",
+    role: "admin",
+    address: addressOf("admin"),
   },
 ];
 
-// Ephemeral Key Management for zkLogin
-export interface EphemeralSession {
-  ephemeralKeypair: Ed25519Keypair;
-  maxEpoch: number;
-  randomness: string;
-  nonce: string;
-  createdAt: number;
+export function findAccount(accountId: string): Account | undefined {
+  return DEMO_ACCOUNTS.find((account) => account.id === accountId);
 }
 
-export function generateEphemeralSession(currentEpoch: number = 100): EphemeralSession {
-  const ephemeralKeypair = new Ed25519Keypair();
-  const maxEpoch = currentEpoch + 10;
-  const randomness = Math.floor(Math.random() * 1000000000000000).toString();
-  
-  // Nonce generation simulation for zkLogin JWT binding
-  const nonce = toBase64(ephemeralKeypair.getPublicKey().toRawBytes()).slice(0, 24);
-
-  return {
-    ephemeralKeypair,
-    maxEpoch,
-    randomness,
-    nonce,
-    createdAt: Date.now(),
-  };
-}
-
-export function getGoogleOAuthUrl(clientId?: string, redirectUri?: string, nonce?: string): string {
-  const cId = clientId || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "104829104829-campus-demo.apps.googleusercontent.com";
-  const rUri = redirectUri || (typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "http://localhost:3000/auth/callback");
-  const n = nonce || "sui_zklogin_ephemeral_nonce_demo";
-
-  return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
-    cId
-  )}&response_type=id_token&redirect_uri=${encodeURIComponent(
-    rUri
-  )}&scope=openid%20email%20profile&nonce=${encodeURIComponent(n)}`;
+export function accountsByRole(role: Account["role"]): Account[] {
+  return DEMO_ACCOUNTS.filter((account) => account.role === role);
 }
