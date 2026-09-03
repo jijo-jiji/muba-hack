@@ -1,0 +1,135 @@
+TrustMesh
+Software Requirements Specification
+Version 3.0 — Individual Talent Model
+Document Version: 3.0
+Last Updated: August 31, 2026
+Status: Draft for Review
+Supersedes: SRS v2.2.1 (December 2025)
+What changed in this version: v2.2.1 was built around companies sponsoring verified student CLUBS, who applied to campaigns as a group. This version rebuilds the platform around individual students matched to jobs by TrustMesh, across two scopes: software development and digital marketing. Clubs are not gone, but they are downgraded from a full account type to a single optional field on a student's profile until the platform is ready to build that out properly. Sections carried over from v2.2.1 with little or no change are marked (carried over). Sections rewritten for this pivot are marked (new/rewritten). A few decisions this document assumes rather than confirms are called out in shaded boxes like this one, and are collected again in the Open Questions section at the end.
+1. Introduction
+1.1 Purpose
+This document specifies the functional and non-functional requirements for the TrustMesh web platform. It is the primary reference for planning, development, and QA as the platform moves from a club-sponsorship model to an individual-student talent marketplace.
+1.2 Scope
+TrustMesh is a marketplace platform connecting companies with individually verified university students for paid project work. TrustMesh — not an open application queue — matches each posted job with the best-fit student. The platform covers exactly two work categories:
+Software Development — building automation websites and systems: landing pages, ERP, HRMS, CRM, and similar tools.
+Digital Marketing — content and campaign work, including handling raw video footage supplied by the client through to edited deliverables.
+In-Scope
+User registration, authentication, and role-based access for Company, Student, and Admin.
+Student verification (university email / student ID) and company verification (email-domain logic plus SSM document review, carried over from v2.2.1).
+Monetization: Finder's Fee (pay-per-match) and Pro Subscription (recurring), carried over from v2.2.1 pending confirmation — see Open Questions.
+Job posting for the two in-scope categories, each with its own required fields.
+A Client Asset Repository — companies can upload raw materials tied to a job: briefs, documents, brand assets, and (for digital marketing) raw video files.
+Admin-driven matching of the best-fit student, or small student team, to each job.
+Deliverable upload and management by the assigned student(s), viewable by the company.
+Automated generation of a Project Report on job completion.
+An administrative back-end for verification, matching, and system oversight.
+Out-of-Scope (this phase)
+Native mobile applications — the platform remains web-responsive.
+Full club workflow. Club accounts, club verification, and committee-roster management (all present in v2.2.1) are not being built right now. Clubs are kept in mind only as a single optional “club affiliation” field on a student's profile.
+On-platform messaging or chat between users.
+Escrow. Carried over as out-of-scope from v2.2.1 by default, but this now conflicts with newer TrustMesh marketing material that references escrow and milestone payments. This needs an explicit decision — see Open Questions.
+Assumption: This document assumes matching is Admin-curated for v1 (a person on the TrustMesh team reviews open jobs and assigns a student), not an open apply-and-select marketplace like v2.2.1's club application flow, and not an automated matching algorithm. Confirm this before the matching workflow (section 3.4) gets built.
+1.3 Definitions, Acronyms, and Abbreviations
+SaaS: Software-as-a-Service
+SRS: Software Requirements Specification
+RBAC: Role-Based Access Control
+Admin: TrustMesh system administrator / operations team member
+Company: A corporate client/user of the platform
+Student: An individually verified university student who is matched to and completes job work
+Software Development Project: A job to build an automation website or system — e.g. a landing page, ERP, HRMS, or CRM
+Digital Marketing Project: A job centered on marketing/content work, which may include raw video footage supplied by the company for the assigned team to work from
+Raw Material / Client Asset: A source file the company provides for a job — briefs, documents, brand guidelines, or raw video
+Deliverable: A file or set of files the assigned student(s) upload as the finished output of a job
+Match / Assignment: The Admin action of selecting a student (or small student team) for an open job
+Finder's Fee: A one-time fee a Free Tier company pays to finalize a match and unlock the student's contact details
+Free Tier: A company account that can post jobs for free but pays per successful match
+Pro Tier: A subscribed company account paying monthly with no per-match fee
+2. Overall Description
+2.1 Product Perspective (rewritten)
+TrustMesh digitizes and streamlines paid, short-term project work between companies and university students. It replaces ad-hoc outreach with a structured, verifiable platform where TrustMesh itself vets and matches talent, rather than students and companies finding each other through open applications. The core value: companies get a vetted individual matched to a well-scoped job with a clean paper trail of raw materials and deliverables, and students get real paid work with a verifiable portfolio.
+Phase 1 model (carried over): low barrier to entry. Companies can join and post for free. Revenue is generated when a match is made and finalized (pay-to-match).
+2.2 User Personas (rewritten)
+Company User (e.g. HR or Marketing Manager): needs an efficient way to post a job, hand over raw materials securely, and receive a vetted individual matched to the work.
+Student User (individual, not a club): a verified university student in software development or digital marketing, looking for real paid project work and a verifiable portfolio.
+TrustMesh Admin (previously “system overseer,” now also the matchmaker): verifies students and companies, reviews open jobs, and assigns the best-fit student or small team to each one.
+The Student Club persona from v2.2.1 is removed as a primary account type. See section 3.6 for how club context is kept without a full club workflow.
+2.3 General Constraints
+The platform must comply with Malaysian data protection law (PDPA).
+Backend: Django (carried over).
+Payment processing via a third-party, PCI-compliant gateway (carried over).
+New constraint: Raw video is now a first-class upload type (digital marketing jobs). Video files are typically far larger than the 25MB per-file cap set in v2.2.1 for deliverables. Plan for object storage (e.g. an S3-compatible bucket) with chunked/resumable upload rather than storing large files directly through the Django app server — see section 4.6.
+3. System Features (Functional Requirements)
+3.1 User & Access Management — RBAC (carried over, trimmed)
+REQ-3.1.1: The system shall support three user roles: Company, Student, and Admin.
+REQ-3.1.2: The system shall provide secure registration and email verification for Company and Student roles.
+REQ-3.1.3 (Company Access): Companies can register and immediately access posting features without paying (Free Tier).
+REQ-3.1.4 (Email Domain Logic): The system shall detect the domain of the email used at Company registration. Corporate domains (e.g. @maxis.com.my) follow Silent Verification (auto-active, queued for admin review); public domains (e.g. @gmail.com) are flagged “High Risk” and must complete Enhanced Verification.
+REQ-3.1.5 (Enhanced Verification): “High Risk” company registrants must upload an SSM (Suruhanjaya Syarikat Malaysia) certificate at sign-up. Campaign posting is blocked until an Admin manually verifies the document.
+REQ-3.1.6 (Student Verification): A new Student registration shall default to Pending Verification. Students verify via university email domain (preferred) or by uploading a student ID / proof of enrolment. An Admin dashboard reviews pending students and sets status to Verified or Rejected, with an automated email on status change.
+REQ-3.1.7 (Email Independence): Students can update their primary email or link a secondary personal email so account access persists after graduation.
+REQ-3.1.8: All users can edit their own profile and securely reset their password.
+Removed from v2.2.1: Club Verification (old REQ-3.1.5), Shadow User Creation triggered by a club roster (old REQ-3.1.12), and Profile Claiming via a club-added roster entry (old REQ-3.1.13) are dropped. A student now registers and verifies directly — there is no club adding them first.
+3.2 Monetization & Billing (carried over, pending confirmation)
+REQ-3.2.1 (Finder's Fee Gate): When a Free Tier Company finalizes a match, the system shall redirect them to the payment gateway to pay the Finder's Fee. The match is only finalized on successful payment.
+REQ-3.2.2 (Pro Subscription): Companies can upgrade to a Pro Plan, bypass the payment gateway per match, and finalize matches instantly.
+REQ-3.2.3: The system must generate a receipt/invoice for every Finder's Fee or subscription payment.
+REQ-3.2.4: The system shall track start_date, end_date, and status (active / past_due / canceled) for each subscription, with automated renewal and payment-failure reminders.
+Open question carried from v2.2.1: v2.2.1 explicitly excluded escrow (budget settled directly between Company and Student/Club). Newer TrustMesh marketing material references escrow and milestone payments. This document does not resolve that conflict — confirm the intended model before this section is finalized, since it changes the payment architecture significantly (holding funds vs. a pure introduction fee).
+3.3 Job Posting & Client Asset Management (rewritten)
+REQ-3.3.1 (Job Types): When creating a job, the Company must select one of exactly two types: Software Development or Digital Marketing.
+Software Development jobs include a Sub-Type field (Landing Page / Website, ERP, HRMS, CRM, Other Automation Tool), a Required Skills / Tech Stack field, and a Project Outcome Description.
+Digital Marketing jobs include a Campaign Objective, target platforms/KPIs, and a Raw Video Upload area for client-supplied footage.
+REQ-3.3.2: All jobs must include a title, description, budget (decimal), an application/matching closing date, and a list of required deliverables.
+REQ-3.3.3 (Client Asset Repository): The Company shall be able to upload raw materials to a job at posting time or at any point afterward: documents, briefs, brand guidelines, and — for Digital Marketing jobs — raw video files.
+REQ-3.3.4 (Asset Access Control): Raw materials for a job shall be visible only to the Company that posted them, the Admin, and the student(s) matched to that job. Materials must not be visible to unmatched students or other companies.
+REQ-3.3.5 (Team Viewing): For Digital Marketing jobs in particular, all students assigned as part of the job's team shall be able to view the raw video and other materials, not only a single primary assignee.
+REQ-3.3.6: Jobs shall have a clear lifecycle status: Draft, Open, Matched, In Progress, Completed, Archived.
+Open question: “The team handling it can view it” implies more than one student may be assigned to a single job (at least for Digital Marketing). This document assumes a many-to-one student-to-job assignment is allowed. Confirm whether Software Development jobs should support multi-student teams too, or stay single-assignee.
+3.4 Matching & Deliverable Workflow (rewritten)
+REQ-3.4.1 (Admin Matching): The Admin shall be able to review Open jobs and assign one Student, or a small team of Students, as the best fit. This replaces the v2.2.1 flow where clubs applied and the Company selected an applicant.
+REQ-3.4.2: On assignment, the system shall: update the job status to Matched, grant the assigned student(s) access to the job's Client Asset Repository, and notify both the Company and the Student(s).
+REQ-3.4.3 (Deliverable Upload): The assigned Student(s) shall be able to upload deliverable files to the job page. Supported types include documents, images, archives, and video, with a per-file size limit appropriate to the type (see section 4.6).
+REQ-3.4.4: Once all required deliverables are submitted, the job can be marked Completed by the assigned student(s), with the Company able to view and download every submitted deliverable from their dashboard.
+3.5 Reporting Engine (carried over, individual version)
+REQ-3.5.1: On a job being marked Completed, the system shall automatically generate a Project Report in PDF format.
+REQ-3.5.2: The Company shall be able to view and download the report from their dashboard.
+REQ-3.5.3 (Report Content): The report shall contain the job title and description, the assigned student(s)' name(s), final budget, timeline (posted / matched / completed), and a list of submitted deliverables with links.
+REQ-3.5.4 (Student Contribution Summary): For each assigned student, the report shall include a short summary of their role, the skills applied, and the project outcome — feeding directly into that student's portfolio (section 3.6).
+3.6 Student Profile & Portfolio (carried over, now central)
+REQ-3.6.1: Every verified Student shall have a shareable public profile at a fixed URL, showing their name, university, a verified-talent badge, skills tags, and completed project history pulled from Project Reports.
+REQ-3.6.2 (Club Affiliation (lightweight)): A Student's profile may optionally include a Club Affiliation field (club name and role). This is a plain profile field only — it does not create a club account, does not require club verification, and does not open a separate club dashboard. It exists so club context isn't lost while the platform focuses on individual talent.
+On clubs: Everything from v2.2.1's club workflow beyond this one field — club registration and verification, the Committee Roster module, Shadow Users created by a club adding a member, and the Organizer-vs-Winner Talent Pool split — is intentionally not built in this version. If clubs become a real second track later, that is closer to a new module than an extension of this field.
+4. Non-Functional Requirements
+4.1 Performance (carried over)
+REQ-4.1.1: Key authenticated pages (dashboard, job list) shall load in under 3 seconds with up to 200 concurrent users.
+REQ-4.1.2: Job search/filter shall return results in under 2 seconds.
+REQ-4.1.3: Report generation must complete within 10 seconds of a job being marked Completed.
+REQ-4.1.4: Payment redirection to the gateway must happen in under 2 seconds.
+REQ-4.1.5: Large file uploads (notably raw video) must be chunked/resumable and must not block or slow down other page interactions while in progress.
+4.2 Security (carried over)
+REQ-4.2.1: All passwords must be hashed with a modern, salted algorithm (e.g. Argon2, bcrypt).
+REQ-4.2.2: The application must follow OWASP Top 10 guidance against SQL injection, XSS, and CSRF.
+REQ-4.2.3: All data in transit must be encrypted with TLS 1.2 or higher.
+REQ-4.2.4: The system must restrict uploads to approved file types and perform virus scanning on all uploaded files, including raw materials and video.
+REQ-4.2.5: All payments are handled via a PCI-compliant gateway; no card data is stored locally.
+4.3 Scalability (carried over, reworded)
+REQ-4.3.1: The architecture must support a launch load of 1,000 students and 100 companies.
+REQ-4.3.2: The system must scale horizontally to support 10,000 students and 1,000 companies within 2 years without significant degradation.
+Figures carried forward from v2.2.1 with “clubs” replaced by “students” — revisit if the individual-first model changes expected volume.
+4.4 Availability (carried over)
+REQ-4.4.1: The platform shall have minimum uptime of 99.5%, excluding scheduled maintenance.
+REQ-4.4.2: Scheduled maintenance shall be communicated to all users at least 48 hours in advance.
+4.5 Usability & Accessibility (carried over)
+REQ-4.5.1: The interface must be fully responsive across desktop, tablet, and mobile web browsers.
+REQ-4.5.2: The platform should meet WCAG 2.1 Level AA for key navigation and forms.
+4.6 Storage & File Handling (new)
+REQ-4.6.1 (Raw Material Storage): Client-supplied raw materials (documents, brand assets, raw video) shall be stored in object storage (e.g. an S3-compatible bucket) rather than on the application server's local disk.
+REQ-4.6.2 (File Size Limits): Document-type uploads keep a limit similar to v2.2.1 (25MB). Video uploads require a materially larger limit; exact ceiling depends on the chosen storage provider and budget — flagged as an open question.
+REQ-4.6.3: Deliverable files follow the same storage and access-control model as raw materials (section 3.3).
+5. Open Questions
+Points this document assumes a default answer for, or leaves undecided. Worth settling before the affected sections are built out further.
+OQ-1 (Matching mechanism): Is matching fully Admin-curated (this document's assumption), Company-selects-from-applicants like v2.2.1 but per student, or an eventual matching algorithm? This drives whether an “apply” UI is needed at all in v1.
+OQ-2 (Escrow): v2.2.1 explicitly excluded escrow. Recent TrustMesh marketing material references escrow and milestone payments. Which model is current? This changes section 3.2's payment architecture significantly.
+OQ-3 (Storage provider & budget): Raw video support needs an object storage decision (S3, Cloudinary, etc.) and a file-size ceiling — both a technical and a cost decision.
+OQ-4 (Team size on a job): Assumed multiple students can be assigned to one job, based on “the team handling it can view it.” Confirm whether this applies to Software Development jobs too, or only Digital Marketing.
+OQ-5 (Club affiliation): Confirm the single optional profile field in section 3.6 is the right amount of “keeping clubs in consideration” for now, versus wanting something slightly more (e.g. a club name directory).

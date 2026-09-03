@@ -1,35 +1,144 @@
-import { GroupPool, Bill } from "./types";
+import { GroupPool, Bill, TrustMeshJob } from "./types";
 import { INITIAL_PERSONAS } from "./zklogin";
+
+export const INITIAL_TRUSTMESH_JOBS: TrustMeshJob[] = [
+  {
+    id: "job_hrms_leave_001",
+    title: "HRMS & Employee Leave Management System",
+    description:
+      "Develop a modern employee leave request and approval portal with calendar overview, notification hooks, and secure department RBAC for an SME workforce of 50 staff.",
+    scope: "software_development",
+    softwareSubType: "HRMS",
+    techStack: ["Next.js", "TypeScript", "Tailwind CSS", "Sui Move"],
+    projectOutcome: "Working self-service employee leave portal with manager approval workflow and calendar sync.",
+    budgetUsdc: 300.0,
+    escrowVaultId: "0x_trustmesh_vault_hrms_300",
+    escrowStatus: "locked",
+    companyName: "Apex Retail Solutions Sdn Bhd",
+    companyEmail: "ops@apexretail.com.my",
+    companyVerification: "corporate_silent",
+    assignedStudent: {
+      id: INITIAL_PERSONAS[1].id,
+      name: INITIAL_PERSONAS[1].name,
+      email: INITIAL_PERSONAS[1].email,
+      address: INITIAL_PERSONAS[1].address,
+      university: "Asia Pacific University (APU)",
+      avatar: INITIAL_PERSONAS[1].avatar,
+    },
+    status: "in_progress",
+    clientAssets: [
+      {
+        id: "ca_1",
+        name: "Apex_Retail_HRMS_Requirements_Spec.pdf",
+        type: "brief",
+        sizeMb: 2.4,
+        url: "#",
+        uploadedAt: Date.now() - 86400000 * 3,
+      },
+      {
+        id: "ca_2",
+        name: "Brand_Design_System_Assets.zip",
+        type: "brand_asset",
+        sizeMb: 14.8,
+        url: "#",
+        uploadedAt: Date.now() - 86400000 * 3,
+      },
+      {
+        id: "ca_3",
+        name: "Employee_Org_Structure_Matrix.xlsx",
+        type: "document",
+        sizeMb: 1.1,
+        url: "#",
+        uploadedAt: Date.now() - 86400000 * 2,
+      },
+    ],
+    deliverables: [],
+    createdAt: Date.now() - 86400000 * 3,
+  },
+  {
+    id: "job_video_campaign_002",
+    title: "Campus Pop-Up Cafe Video Campaign & Short-Form Ads",
+    description:
+      "Edit 3 high-impact vertical video ads (9:16) from client-supplied raw 4K footage with motion captions, trending audio sync, and TikTok/Instagram Reels optimization.",
+    scope: "digital_marketing",
+    campaignObjective: "Achieve 50,000 organic video views and drive foot traffic to campus pop-up cafe launch.",
+    targetPlatforms: ["TikTok", "Instagram Reels", "YouTube Shorts"],
+    kpiTargets: "3 finished 30-sec videos + creative hooks + caption copy",
+    budgetUsdc: 180.0,
+    escrowVaultId: "0x_trustmesh_vault_video_180",
+    escrowStatus: "locked",
+    companyName: "Daily Brew Artisan Cafe",
+    companyEmail: "marketing@dailybrew.my",
+    companyVerification: "ssm_verified",
+    assignedStudent: {
+      id: INITIAL_PERSONAS[2].id,
+      name: INITIAL_PERSONAS[2].name,
+      email: INITIAL_PERSONAS[2].email,
+      address: INITIAL_PERSONAS[2].address,
+      university: "Multimedia University (MMU)",
+      avatar: INITIAL_PERSONAS[2].avatar,
+    },
+    status: "open",
+    clientAssets: [
+      {
+        id: "ca_4",
+        name: "Raw_Barista_Latte_Art_4K_60fps.mp4",
+        type: "raw_video",
+        sizeMb: 68.5,
+        url: "#",
+        uploadedAt: Date.now() - 86400000,
+      },
+      {
+        id: "ca_5",
+        name: "Store_Interior_B_Roll_Footage.mp4",
+        type: "raw_video",
+        sizeMb: 42.1,
+        url: "#",
+        uploadedAt: Date.now() - 86400000,
+      },
+      {
+        id: "ca_6",
+        name: "Cafe_Brand_Guidelines_and_Soundtrack.pdf",
+        type: "brand_asset",
+        sizeMb: 3.5,
+        url: "#",
+        uploadedAt: Date.now() - 86400000,
+      },
+    ],
+    deliverables: [],
+    createdAt: Date.now() - 86400000,
+  },
+];
 
 export const INITIAL_GROUP_POOLS: GroupPool[] = [
   {
     id: "pool_apu_hackers_01",
-    name: "APU Web3 Hackers & Dinner Tab",
-    creator: INITIAL_PERSONAS[0].address, // Alice
-    clubTreasury: INITIAL_PERSONAS[4].address, // Eva (Club Treasury)
-    clubFeeBps: 250, // 2.5% Club dues
-    totalExpenses: 284.50,
-    totalSettled: 194.50,
-    treasuryBalance: 6.80,
+    name: "APU Web3 Hackers & Project Team Tab",
+    creator: INITIAL_PERSONAS[0].address,
+    clubTreasury: INITIAL_PERSONAS[4].address,
+    clubFeeBps: 250,
+    totalExpenses: 284.5,
+    totalSettled: 194.5,
+    treasuryBalance: 6.8,
     isActive: true,
     members: [
       {
         address: INITIAL_PERSONAS[0].address,
         name: INITIAL_PERSONAS[0].name,
         avatar: INITIAL_PERSONAS[0].avatar,
-        netBalance: 120.0, // Alice covered expenses, owed money
+        netBalance: 120.0,
       },
       {
         address: INITIAL_PERSONAS[1].address,
         name: INITIAL_PERSONAS[1].name,
         avatar: INITIAL_PERSONAS[1].avatar,
-        netBalance: -45.0, // Bob owes
+        netBalance: -45.0,
       },
       {
         address: INITIAL_PERSONAS[2].address,
         name: INITIAL_PERSONAS[2].name,
         avatar: INITIAL_PERSONAS[2].avatar,
-        netBalance: -75.0, // Charlie owes
+        netBalance: -75.0,
       },
     ],
     bills: [
@@ -39,12 +148,12 @@ export const INITIAL_GROUP_POOLS: GroupPool[] = [
         title: "Post-Hackathon Mamak Supper (Table #07)",
         category: "Dining",
         totalAmount: 60.0,
-        payerAddress: INITIAL_PERSONAS[0].address, // Alice paid
+        payerAddress: INITIAL_PERSONAS[0].address,
         payerName: "Alice Tan",
         memberCount: 3,
         amountPerMember: 20.0,
-        clubDueAmount: 0.50, // 2.5% of 20
-        repaidCount: 1, // Alice covered her own, Bob owes, Charlie paid
+        clubDueAmount: 0.5,
+        repaidCount: 1,
         isFullySettled: false,
         createdAt: Date.now() - 3600 * 1000 * 2,
         items: [
@@ -58,7 +167,7 @@ export const INITIAL_GROUP_POOLS: GroupPool[] = [
             name: "Alice Tan (Payer)",
             avatar: "👩🏻‍💻",
             amount: 20.0,
-            dues: 0.50,
+            dues: 0.5,
             status: "paid",
             paidTxDigest: "0x89f2...a41c",
             paidAt: Date.now() - 7200000,
@@ -68,7 +177,7 @@ export const INITIAL_GROUP_POOLS: GroupPool[] = [
             name: "Bob Lee",
             avatar: "👨🏻‍🎓",
             amount: 20.0,
-            dues: 0.50,
+            dues: 0.5,
             status: "pending",
           },
           {
@@ -76,55 +185,10 @@ export const INITIAL_GROUP_POOLS: GroupPool[] = [
             name: "Charlie Wong",
             avatar: "🧑🏽‍💻",
             amount: 20.0,
-            dues: 0.50,
+            dues: 0.5,
             status: "paid",
             paidTxDigest: "0x3e11...b902",
             paidAt: Date.now() - 3600000,
-          },
-        ],
-      },
-      {
-        id: "bill_cloud_infra_002",
-        poolId: "pool_apu_hackers_01",
-        title: "Testnet Node RPC & Cloud Infra",
-        category: "Hackathon Supplies",
-        totalAmount: 90.0,
-        payerAddress: INITIAL_PERSONAS[0].address,
-        payerName: "Alice Tan",
-        memberCount: 3,
-        amountPerMember: 30.0,
-        clubDueAmount: 0.75,
-        repaidCount: 1,
-        isFullySettled: false,
-        createdAt: Date.now() - 86400 * 1000,
-        items: [
-          { id: "i4", name: "Dedicated Fullnode VPS (1 mo)", price: 60.0, assignedTo: [INITIAL_PERSONAS[0].address, INITIAL_PERSONAS[1].address, INITIAL_PERSONAS[2].address] },
-          { id: "i5", name: "Domain & SSL Certificates", price: 30.0, assignedTo: [INITIAL_PERSONAS[0].address, INITIAL_PERSONAS[1].address, INITIAL_PERSONAS[2].address] },
-        ],
-        splitMembers: [
-          {
-            address: INITIAL_PERSONAS[0].address,
-            name: "Alice Tan (Payer)",
-            avatar: "👩🏻‍💻",
-            amount: 30.0,
-            dues: 0.75,
-            status: "paid",
-          },
-          {
-            address: INITIAL_PERSONAS[1].address,
-            name: "Bob Lee",
-            avatar: "👨🏻‍🎓",
-            amount: 30.0,
-            dues: 0.75,
-            status: "pending",
-          },
-          {
-            address: INITIAL_PERSONAS[2].address,
-            name: "Charlie Wong",
-            avatar: "🧑🏽‍💻",
-            amount: 30.0,
-            dues: 0.75,
-            status: "pending",
           },
         ],
       },

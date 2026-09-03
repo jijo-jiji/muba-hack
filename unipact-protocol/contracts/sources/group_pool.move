@@ -1,4 +1,4 @@
-module unipact::group_pool {
+module trustmesh::group_pool {
     use sui::object::{Self, UID};
     use sui::tx_context::{Self, TxContext};
     use sui::coin::{Self, Coin};
@@ -14,7 +14,7 @@ module unipact::group_pool {
     const EPOOL_INACTIVE: u64 = 103;
     const EINVALID_MEMBER_COUNT: u64 = 104;
 
-    /// GroupPool: Shared Object managing group expenses, owed balances, dues, and settlement history
+    /// GroupPool: Shared Object managing team expenses, owed balances, dues, and multi-student team splits
     public struct GroupPool<phantom T> has key {
         id: UID,
         creator: address,
@@ -27,7 +27,7 @@ module unipact::group_pool {
         is_active: bool,
     }
 
-    /// Bill: Represents an itemized or split invoice covered by a payer
+    /// Bill: Represents an itemized or split invoice covered by a payer or team project
     public struct Bill has key, store {
         id: UID,
         pool_id: address,
@@ -85,7 +85,7 @@ module unipact::group_pool {
         reason: String,
     }
 
-    /// Initializes a new group pool (e.g., campus club event, dorm tab, dining table)
+    /// Initializes a new group pool (e.g., student team project, campus club event, dining tab)
     public entry fun create_group_pool<T>(
         name: String,
         club_treasury: address,
@@ -172,7 +172,7 @@ module unipact::group_pool {
         transfer::share_object(bill);
     }
 
-    /// Atomic repayment PTB call: Settles an individual member's share + club dues
+    /// Atomic repayment PTB call: Settles an individual member's share + platform dues
     public entry fun settle_member_split<T>(
         pool: &mut GroupPool<T>,
         bill: &mut Bill,
@@ -232,7 +232,7 @@ module unipact::group_pool {
         });
     }
 
-    /// Admin dispute resolution: Treasurer arbitrates and closes/modifies bill
+    /// Admin dispute resolution: Arbitrator settles dispute and marks bill finalized
     public entry fun resolve_dispute<T>(
         cap: &AdminCap,
         pool: &mut GroupPool<T>,
@@ -253,7 +253,7 @@ module unipact::group_pool {
         });
     }
 
-    /// Admin action: Withdraw collected club/platform treasury dues
+    /// Admin action: Withdraw collected platform / club treasury dues
     public entry fun withdraw_club_dues<T>(
         cap: &AdminCap,
         pool: &mut GroupPool<T>,

@@ -6,9 +6,89 @@ export interface ZkLoginPersona {
   email: string;
   address: string;
   avatar: string;
-  role: "student" | "payer" | "treasurer" | "merchant";
+  role: "student" | "payer" | "treasurer" | "merchant" | "company";
   keypair: Keypair;
   usdcBalance: number;
+  university?: string;
+  clubAffiliation?: string;
+}
+
+export type ProjectScope = "software_development" | "digital_marketing";
+
+export type SoftwareSubType = "Landing Page / Website" | "ERP" | "HRMS" | "CRM" | "Custom Automation Tool";
+
+export interface ClientAsset {
+  id: string;
+  name: string;
+  type: "document" | "brand_asset" | "raw_video" | "brief";
+  sizeMb: number;
+  url: string;
+  uploadedAt: number;
+}
+
+export interface JobDeliverable {
+  id: string;
+  title: string;
+  type: "github_pr" | "live_demo" | "video_deliverable" | "documentation";
+  link: string;
+  summary: string;
+  submittedAt: number;
+}
+
+export interface ProjectReport {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  scope: ProjectScope;
+  companyName: string;
+  studentName: string;
+  studentAddress: string;
+  university: string;
+  budgetUsdc: number;
+  studentPayoutUsdc: number;
+  platformFeeUsdc: number;
+  truthScore: number;
+  gonkaRequestId: string;
+  completedAt: string;
+  skillsApplied: string[];
+  outcomeSummary: string;
+}
+
+export interface TrustMeshJob {
+  id: string;
+  title: string;
+  description: string;
+  scope: ProjectScope;
+  // Software Dev Specific
+  softwareSubType?: SoftwareSubType;
+  techStack?: string[];
+  projectOutcome?: string;
+  // Digital Marketing Specific
+  campaignObjective?: string;
+  targetPlatforms?: string[];
+  kpiTargets?: string;
+  // Financial & Escrow
+  budgetUsdc: number;
+  escrowVaultId: string;
+  escrowStatus: "unfunded" | "locked" | "released" | "refunded";
+  // Company Info
+  companyName: string;
+  companyEmail: string;
+  companyVerification: "corporate_silent" | "ssm_verified" | "pending_ssm";
+  // Assignment
+  assignedStudent?: {
+    id: string;
+    name: string;
+    email: string;
+    address: string;
+    university: string;
+    avatar: string;
+  };
+  status: "open" | "matched" | "in_progress" | "audited" | "settled";
+  clientAssets: ClientAsset[];
+  deliverables: JobDeliverable[];
+  projectReport?: ProjectReport;
+  createdAt: number;
 }
 
 export interface ItemizedEntry {
@@ -62,7 +142,7 @@ export interface GroupPool {
     address: string;
     name: string;
     avatar: string;
-    netBalance: number; // positive = owed money, negative = owes money
+    netBalance: number;
   }[];
 }
 
@@ -107,39 +187,39 @@ export interface MilestoneAuditResult {
 
 export const DEMO_PRESETS = {
   VALID_DELIVERABLE: {
-    title: "Production Sui PTB Gas Relayer & Frontend UI",
-    spec: "Develop a mobile-friendly Next.js web interface integrating zkLogin, dual-signed sponsored transactions, and atomic PTB settlements in testnet USDC.",
-    submission: "PR #14 merged to main. Implemented Move contracts (GroupPool, Bill, AdminCap), @mysten/sui PTB builders, /api/sponsor gas relayer endpoint, and camera QR scanner.",
+    title: "Production ERP & HRMS Leave Module on Sui",
+    spec: "Develop a mobile-friendly automation portal integrating company authentication, employee leave requests, approval routing, and gasless audit settlements in testnet USDC.",
+    submission: "PR #18 merged to main branch. Implemented Move escrow smart contracts, Gonka Router verification, Sui PTB relayer signing, and client asset repository.",
     mockResult: {
       truthScore: 94,
       isApproved: true,
       scopeScore: 95,
       qualityScore: 92,
       reasoningTrace: [
-        "Verified zkLogin integration with deterministic address derivation and ephemeral keypair session binding.",
-        "Validated sponsored PTB builder bundling coin splits, payer reimbursement, and MoveCall in a single transaction.",
-        "Verified camera QR scanner and dynamic merchant POS checkout interfaces.",
-        "Zero placeholder code or missing dependencies detected.",
+        "Verified full functional compliance with SME project specification.",
+        "Verified gasless PTB execution routing 90% to student and 10% to TrustMesh Treasury.",
+        "Verified client asset handling and confidential repository permissions.",
+        "Zero placeholder code or unfinished TODO comments detected.",
       ],
-      gonkaRequestId: "gnk-req-2026-unipact-pass",
+      gonkaRequestId: "gnk-req-2026-trustmesh-pass",
       auditedAt: new Date().toISOString(),
     },
   },
   INCOMPLETE_DELIVERABLE: {
     title: "Incomplete / Placeholder Submission",
-    spec: "Implement full end-to-end atomic split repayment with dual-signed sponsored transactions.",
-    submission: "TODO: write Move contracts later. Added a placeholder button that does not execute on-chain.",
+    spec: "Implement complete milestone deliverable with end-to-end integration and asset verification.",
+    submission: "TODO: integrate smart contracts later. Added dummy UI placeholder.",
     mockResult: {
       truthScore: 42,
       isApproved: false,
       scopeScore: 40,
       qualityScore: 45,
       reasoningTrace: [
-        "Deficiency: Crucial Move smart contracts and PTB execution blocks are missing.",
-        "Deficiency: Placeholder TODO remarks found in source files.",
+        "Deficiency: Core milestone contracts and PTB execution blocks are missing.",
+        "Deficiency: Found placeholder TODO comments in code files.",
         "Truth score below 80% threshold. Automated PTB release locked.",
       ],
-      gonkaRequestId: "gnk-req-2026-unipact-reject",
+      gonkaRequestId: "gnk-req-2026-trustmesh-reject",
       auditedAt: new Date().toISOString(),
     },
   },

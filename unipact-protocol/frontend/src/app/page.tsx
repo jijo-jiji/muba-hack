@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Header } from "@/components/Header";
+import { TrustMeshMarketplace } from "@/components/TrustMeshMarketplace";
+import { StudentPortfolioModal } from "@/components/StudentPortfolioModal";
 import { BillSplitter } from "@/components/BillSplitter";
 import { MerchantPOS } from "@/components/MerchantPOS";
 import { GroupLedger } from "@/components/GroupLedger";
@@ -10,28 +12,41 @@ import { QRScannerModal } from "@/components/QRScannerModal";
 import { ReceiptModal } from "@/components/ReceiptModal";
 import { FaucetModal } from "@/components/FaucetModal";
 
-// Escrow Engine components
+// Escrow & Gonka AI Audit components
 import { ProjectCard } from "@/components/ProjectCard";
 import { Step1Submit } from "@/components/Step1Submit";
 import { Step2AuditReport } from "@/components/Step2AuditReport";
 import { Step3Settlement } from "@/components/Step3Settlement";
 
-// Types & Data
-import { ZkLoginPersona, Bill, GroupPool, MerchantQRPayload, MilestoneAuditResult } from "@/lib/types";
+// Types & Initial Data
+import {
+  ZkLoginPersona,
+  Bill,
+  GroupPool,
+  MerchantQRPayload,
+  MilestoneAuditResult,
+  TrustMeshJob,
+} from "@/lib/types";
 import { INITIAL_PERSONAS } from "@/lib/zklogin";
-import { INITIAL_GROUP_POOLS } from "@/lib/mockData";
+import { INITIAL_TRUSTMESH_JOBS, INITIAL_GROUP_POOLS } from "@/lib/mockData";
 import { useDualSignSponsoredTx } from "@/hooks/useDualSignSponsoredTx";
-import { Sparkles, Shield, Layers, Zap, Store, Users, CheckCircle2 } from "lucide-react";
+import { Sparkles, Shield, Layers, Zap, Store, Users, Briefcase, Award } from "lucide-react";
 
 export default function Home() {
-  // zkLogin Persona State (defaulting to Bob who has pending repayments)
-  const [currentPersona, setCurrentPersona] = useState<ZkLoginPersona>(INITIAL_PERSONAS[1]); // Bob Lee
-  const [activeTab, setActiveTab] = useState<"splitter" | "pos" | "ledger" | "escrow">("splitter");
+  // zkLogin Persona (defaulting to Bob Lee, verified student talent)
+  const [currentPersona, setCurrentPersona] = useState<ZkLoginPersona>(INITIAL_PERSONAS[1]);
+  const [activeTab, setActiveTab] = useState<"marketplace" | "escrow" | "splitter" | "pos" | "ledger">("marketplace");
+
+  // TrustMesh Jobs State
+  const [jobs, setJobs] = useState<TrustMeshJob[]>(INITIAL_TRUSTMESH_JOBS);
+  const [selectedJobId, setSelectedJobId] = useState<string>(INITIAL_TRUSTMESH_JOBS[0].id);
+  const selectedJob = jobs.find((j) => j.id === selectedJobId) || jobs[0];
 
   // Modals
   const [isZkLoginModalOpen, setIsZkLoginModalOpen] = useState(false);
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const [isFaucetOpen, setIsFaucetOpen] = useState(false);
+  const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<{
     isOpen: boolean;
     title: string;
@@ -45,11 +60,11 @@ export default function Home() {
     explorerUrl: string;
   } | null>(null);
 
-  // Group Pool Shared Object State
+  // Group Pool Shared Object State (for Team Splits)
   const [groupPools, setGroupPools] = useState<GroupPool[]>(INITIAL_GROUP_POOLS);
   const activePool = groupPools[0];
 
-  // Escrow Engine State
+  // Escrow & Gonka AI State
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<MilestoneAuditResult | null>(null);
   const [projectStatus, setProjectStatus] = useState<
@@ -64,208 +79,64 @@ export default function Home() {
     isExecuting,
   } = useDualSignSponsoredTx();
 
-  // Handle Atomic Bill Repayment PTB (<500ms execution)
-  const handleSettleBillMember = async (bill: Bill, repayAmount: number, duesAmount: number) => {
-    try {
-      const res = await executeBillRepayment(
-        {
-          poolId: activePool.id,
-          billId: bill.id,
-          payerAddress: bill.payerAddress,
-          clubTreasuryAddress: activePool.clubTreasury,
-          memberRepayAmountUsdc: repayAmount,
-          clubDueAmountUsdc: duesAmount,
-        },
-        currentPersona.keypair
-      );
-
-      const totalPaid = repayAmount + duesAmount;
-
-      // Update Persona Balance
-      setCurrentPersona((prev) => ({
-        ...prev,
-        usdcBalance: Math.max(0, prev.usdcBalance - totalPaid),
-      }));
-
-      // Update GroupPool state
-      setGroupPools((prevPools) => {
-        return prevPools.map((pool) => {
-          if (pool.id !== activePool.id) return pool;
-
-          const updatedBills = pool.bills.map((b) => {
-            if (b.id !== bill.id) return b;
-            const updatedMembers = b.splitMembers.map((m) => {
-              if (
-                m.address.toLowerCase() === currentPersona.address.toLowerCase() ||
-                (currentPersona.id === "bob" && m.name.includes("Bob")) ||
-                (currentPersona.id === "charlie" && m.name.includes("Charlie"))
-              ) {
-                return {
-                  ...m,
-                  status: "paid" as const,
-                  paidTxDigest: res.digest,
-                  paidAt: Date.now(),
-                };
-              }
-              return m;
-            });
-            const repaidCount = updatedMembers.filter((m) => m.status === "paid").length;
-            return {
-              ...b,
-              repaidCount,
-              isFullySettled: repaidCount >= b.memberCount,
-              splitMembers: updatedMembers,
-            };
-          });
-
-          // Recalculate member balances
-          const updatedMembers = pool.members.map((m) => {
-            if (
-              m.address.toLowerCase() === currentPersona.address.toLowerCase() ||
-              (currentPersona.id === "bob" && m.name.includes("Bob"))
-            ) {
-              return { ...m, netBalance: m.netBalance + repayAmount };
-            }
-            if (m.address.toLowerCase() === bill.payerAddress.toLowerCase()) {
-              return { ...m, netBalance: m.netBalance - repayAmount };
-            }
-            return m;
-          });
-
-          return {
-            ...pool,
-            totalSettled: pool.totalSettled + repayAmount,
-            treasuryBalance: pool.treasuryBalance + duesAmount,
-            bills: updatedBills,
-            members: updatedMembers,
-          };
-        });
-      });
-
-      // Trigger high-tech Receipt Modal
-      setReceiptData({
-        isOpen: true,
-        title: `Atomic Repayment for ${bill.title}`,
-        totalAmount: totalPaid,
-        payerAmount: repayAmount,
-        duesAmount: duesAmount,
-        payerName: bill.payerName,
-        digest: res.digest,
-        executionTimeMs: res.executionTimeMs,
-        isGasSponsored: true,
-        explorerUrl: res.explorerUrl,
-      });
-    } catch (err: any) {
-      console.error("Bill settlement failed:", err);
-    }
-  };
-
-  // Handle Merchant / Club POS QR Payment
-  const handleConfirmPOSPayment = async (payload: MerchantQRPayload) => {
-    try {
-      const res = await executeMerchantPayment(
-        {
-          merchantAddress: payload.merchantAddress,
-          totalAmountUsdc: payload.amount,
-          clubTreasuryAddress: activePool.clubTreasury,
-          clubDueAmountUsdc: payload.clubDues,
-          itemDescription: payload.title,
-        },
-        currentPersona.keypair
-      );
-
-      // Deduct balance
-      setCurrentPersona((prev) => ({
-        ...prev,
-        usdcBalance: Math.max(0, prev.usdcBalance - payload.amount),
-      }));
-
-      setIsQRScannerOpen(false);
-
-      // Show receipt
-      setReceiptData({
-        isOpen: true,
-        title: `POS Checkout: ${payload.title}`,
-        totalAmount: payload.amount,
-        payerAmount: payload.amount - (payload.clubDues || 0),
-        duesAmount: payload.clubDues || 0,
-        payerName: payload.merchantName,
-        digest: res.digest,
-        executionTimeMs: res.executionTimeMs,
-        isGasSponsored: true,
-        explorerUrl: res.explorerUrl,
-      });
-    } catch (err: any) {
-      console.error("Merchant payment failed:", err);
-    }
-  };
-
-  // Handle Creating a new bill
-  const handleCreateNewBill = (newBillData: Partial<Bill>) => {
-    const newBill: Bill = {
-      id: `bill_${Date.now()}`,
-      poolId: activePool.id,
-      title: newBillData.title || "Shared Expense",
-      category: newBillData.category || "Dining",
-      totalAmount: newBillData.totalAmount || 0,
-      payerAddress: newBillData.payerAddress || currentPersona.address,
-      payerName: newBillData.payerName || currentPersona.name,
-      memberCount: newBillData.memberCount || 3,
-      amountPerMember: newBillData.amountPerMember || 0,
-      clubDueAmount: newBillData.clubDueAmount || 0,
-      repaidCount: 1,
-      isFullySettled: false,
+  // Create New Job Handler
+  const handleCreateJob = (newJobData: Partial<TrustMeshJob>) => {
+    const job: TrustMeshJob = {
+      id: `job_${Date.now()}`,
+      title: newJobData.title || "Custom Project",
+      description: newJobData.description || "",
+      scope: newJobData.scope || "software_development",
+      budgetUsdc: newJobData.budgetUsdc || 300,
+      escrowVaultId: `0x_vault_${Date.now()}`,
+      escrowStatus: "locked",
+      companyName: newJobData.companyName || "Corporate Partner",
+      companyEmail: newJobData.companyEmail || currentPersona.email,
+      companyVerification: newJobData.companyVerification || "corporate_silent",
+      status: "open",
+      clientAssets: newJobData.clientAssets || [],
+      deliverables: [],
       createdAt: Date.now(),
-      splitMembers: newBillData.splitMembers || [],
+      ...(newJobData.scope === "software_development"
+        ? {
+            softwareSubType: newJobData.softwareSubType || "HRMS",
+            techStack: newJobData.techStack || ["Next.js", "TypeScript"],
+            projectOutcome: newJobData.projectOutcome || "Automation portal",
+          }
+        : {
+            campaignObjective: newJobData.campaignObjective || "Brand Awareness",
+            targetPlatforms: ["TikTok", "Instagram Reels"],
+            kpiTargets: "3 edited reels",
+          }),
     };
 
-    setGroupPools((prevPools) =>
-      prevPools.map((pool) =>
-        pool.id === activePool.id
+    setJobs((prev) => [job, ...prev]);
+    setSelectedJobId(job.id);
+  };
+
+  const handleAssignSelf = (jobId: string) => {
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId
           ? {
-              ...pool,
-              totalExpenses: pool.totalExpenses + newBill.totalAmount,
-              bills: [newBill, ...pool.bills],
+              ...j,
+              status: "in_progress",
+              assignedStudent: {
+                id: currentPersona.id,
+                name: currentPersona.name,
+                email: currentPersona.email,
+                address: currentPersona.address,
+                university: currentPersona.university || "Asia Pacific University (APU)",
+                avatar: currentPersona.avatar,
+              },
             }
-          : pool
+          : j
       )
     );
+    setSelectedJobId(jobId);
+    setActiveTab("escrow");
   };
 
-  // AdminCap actions
-  const handleAdminResolveDispute = (billId: string, reason: string) => {
-    setGroupPools((prevPools) =>
-      prevPools.map((pool) => {
-        if (pool.id !== activePool.id) return pool;
-        return {
-          ...pool,
-          bills: pool.bills.map((b) => (b.id === billId ? { ...b, isFullySettled: true } : b)),
-        };
-      })
-    );
-    alert(`Dispute resolved via AdminCap: ${reason}`);
-  };
-
-  const handleAdminWithdrawDues = () => {
-    const dues = activePool.treasuryBalance;
-    setGroupPools((prevPools) =>
-      prevPools.map((pool) =>
-        pool.id === activePool.id ? { ...pool, treasuryBalance: 0 } : pool
-      )
-    );
-    alert(`Withdrawn $${dues.toFixed(2)} USDC in club treasury dues to ${currentPersona.name}`);
-  };
-
-  const handleAdminCloseTab = () => {
-    setGroupPools((prevPools) =>
-      prevPools.map((pool) =>
-        pool.id === activePool.id ? { ...pool, isActive: false } : pool
-      )
-    );
-    alert("Group Tab frozen & closed via AdminCap.");
-  };
-
-  // Escrow Audit Handlers
+  // Gonka Forensic Audit Submission Handler
   const handleInitiateAudit = async (spec: string, submission: string, preset?: "VALID" | "INCOMPLETE") => {
     setIsAuditing(true);
     setProjectStatus("auditing");
@@ -289,6 +160,7 @@ export default function Home() {
     }
   };
 
+  // Gasless Escrow Milestone Release Handler (90% Student / 10% Treasury)
   const handleExecuteEscrowSettlement = async () => {
     if (!auditResult) return;
     try {
@@ -297,15 +169,28 @@ export default function Home() {
         auditResult.truthScore,
         currentPersona.keypair
       );
+
       if (res.status === "success") {
         setProjectStatus("settled");
-        setCurrentPersona((prev) => ({ ...prev, usdcBalance: prev.usdcBalance + 270 }));
+        const totalBudget = selectedJob.budgetUsdc;
+        const studentPayout = totalBudget * 0.9;
+        const platformFee = totalBudget * 0.1;
+
+        setCurrentPersona((prev) => ({
+          ...prev,
+          usdcBalance: prev.usdcBalance + studentPayout,
+        }));
+
+        setJobs((prev) =>
+          prev.map((j) => (j.id === selectedJobId ? { ...j, status: "settled" } : j))
+        );
+
         setReceiptData({
           isOpen: true,
-          title: "Milestone Payout: 90% Student / 10% Treasury",
-          totalAmount: 300.0,
-          payerAmount: 270.0,
-          duesAmount: 30.0,
+          title: `Milestone Release: ${selectedJob.title}`,
+          totalAmount: totalBudget,
+          payerAmount: studentPayout,
+          duesAmount: platformFee,
           payerName: currentPersona.name,
           digest: res.digest,
           executionTimeMs: res.executionTimeMs,
@@ -318,78 +203,150 @@ export default function Home() {
     }
   };
 
+  // Team Split PTB Handler
+  const handleSettleBillMember = async (bill: Bill, repayAmount: number, duesAmount: number) => {
+    try {
+      const res = await executeBillRepayment(
+        {
+          poolId: activePool.id,
+          billId: bill.id,
+          payerAddress: bill.payerAddress,
+          clubTreasuryAddress: activePool.clubTreasury,
+          memberRepayAmountUsdc: repayAmount,
+          clubDueAmountUsdc: duesAmount,
+        },
+        currentPersona.keypair
+      );
+
+      const totalPaid = repayAmount + duesAmount;
+
+      setCurrentPersona((prev) => ({
+        ...prev,
+        usdcBalance: Math.max(0, prev.usdcBalance - totalPaid),
+      }));
+
+      setReceiptData({
+        isOpen: true,
+        title: `Team Split Settlement: ${bill.title}`,
+        totalAmount: totalPaid,
+        payerAmount: repayAmount,
+        duesAmount: duesAmount,
+        payerName: bill.payerName,
+        digest: res.digest,
+        executionTimeMs: res.executionTimeMs,
+        isGasSponsored: true,
+        explorerUrl: res.explorerUrl,
+      });
+    } catch (err: any) {
+      console.error("Bill settlement failed:", err);
+    }
+  };
+
+  // POS Payment Handler
+  const handleConfirmPOSPayment = async (payload: MerchantQRPayload) => {
+    try {
+      const res = await executeMerchantPayment(
+        {
+          merchantAddress: payload.merchantAddress,
+          totalAmountUsdc: payload.amount,
+          clubTreasuryAddress: activePool.clubTreasury,
+          clubDueAmountUsdc: payload.clubDues,
+          itemDescription: payload.title,
+        },
+        currentPersona.keypair
+      );
+
+      setCurrentPersona((prev) => ({
+        ...prev,
+        usdcBalance: Math.max(0, prev.usdcBalance - payload.amount),
+      }));
+
+      setIsQRScannerOpen(false);
+
+      setReceiptData({
+        isOpen: true,
+        title: `POS Checkout: ${payload.title}`,
+        totalAmount: payload.amount,
+        payerAmount: payload.amount - (payload.clubDues || 0),
+        duesAmount: payload.clubDues || 0,
+        payerName: payload.merchantName,
+        digest: res.digest,
+        executionTimeMs: res.executionTimeMs,
+        isGasSponsored: true,
+        explorerUrl: res.explorerUrl,
+      });
+    } catch (err: any) {
+      console.error("Merchant payment failed:", err);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-950 text-slate-100 selection:bg-sky-500 selection:text-white">
-      {/* Top Header */}
+      {/* Top Header Navigation */}
       <Header
         currentPersona={currentPersona}
         onOpenZkLoginModal={() => setIsZkLoginModalOpen(true)}
         onOpenQRScanner={() => setIsQRScannerOpen(true)}
         onOpenFaucet={() => setIsFaucetOpen(true)}
+        onOpenPortfolio={() => setIsPortfolioOpen(true)}
         activeTab={activeTab}
         onChangeTab={setActiveTab}
       />
 
-      {/* Gas Relayer Operational Status Bar */}
+      {/* Gas Relayer & Network Operational Bar */}
       <div className="bg-sky-950/60 border-b border-sky-500/20 py-1.5 px-4 text-center">
         <div className="max-w-7xl mx-auto flex items-center justify-between text-[11px] font-mono">
           <div className="flex items-center gap-2 text-sky-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
             <span>
-              <strong>Operational Gas Station:</strong> Relayer Active &bull; Dual-Sign Sponsored &bull; 0 SUI User Gas
+              <strong>TrustMesh Relayer:</strong> Operational Gas Pool Active &bull; 0 SUI Gas Fees &bull; Testnet USDC Escrow
             </span>
           </div>
           <div className="hidden sm:flex items-center gap-3 text-slate-400">
-            <span>Sui Network: <strong>Testnet / Local</strong></span>
-            <span>zkLogin Ephemeral Session: <strong>Valid (Epoch 110)</strong></span>
+            <span>Sui Testnet: <strong>Connected</strong></span>
+            <span>Gonka Router: <strong>api.gonkarouter.io</strong></span>
+            <span>zkLogin Ephemeral Session: <strong>Active</strong></span>
           </div>
         </div>
       </div>
 
-      {/* Main Container */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* TAB 1: Atomic Bill Splitter & PTB Builder */}
-        {activeTab === "splitter" && (
-          <BillSplitter
+        {/* TAB 1: Talent Marketplace & Jobs */}
+        {activeTab === "marketplace" && (
+          <TrustMeshMarketplace
             currentPersona={currentPersona}
-            activePool={activePool}
-            onSettleBillMember={handleSettleBillMember}
-            onCreateNewBill={handleCreateNewBill}
-            isSettling={isExecuting}
+            jobs={jobs}
+            selectedJobId={selectedJobId}
+            onSelectJob={(j) => {
+              setSelectedJobId(j.id);
+              setActiveTab("escrow");
+            }}
+            onCreateJob={handleCreateJob}
+            onAssignSelf={handleAssignSelf}
           />
         )}
 
-        {/* TAB 2: Merchant & Club POS QR Terminal */}
-        {activeTab === "pos" && (
-          <MerchantPOS
-            currentPersona={currentPersona}
-            onSimulateCustomerPayment={handleConfirmPOSPayment}
-            isExecutingPayment={isExecuting}
-          />
-        )}
-
-        {/* TAB 3: Group Ledger & AdminCap Arbitrator */}
-        {activeTab === "ledger" && (
-          <GroupLedger
-            currentPersona={currentPersona}
-            activePool={activePool}
-            onAdminResolveDispute={handleAdminResolveDispute}
-            onAdminWithdrawDues={handleAdminWithdrawDues}
-            onAdminCloseTab={handleAdminCloseTab}
-          />
-        )}
-
-        {/* TAB 4: Freelance Milestone Escrow (Gonka AI) */}
+        {/* TAB 2: AI Milestone Audit & Escrow (Gonka Router) */}
         {activeTab === "escrow" && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <ProjectCard escrowAmount={300.0} status={projectStatus} />
+            <ProjectCard
+              escrowAmount={selectedJob.budgetUsdc}
+              status={projectStatus}
+            />
+
             <div className="space-y-6">
               <Step1Submit
                 onInitiateAudit={handleInitiateAudit}
                 isAuditing={isAuditing}
                 disabled={projectStatus === "settled"}
               />
-              <Step2AuditReport auditResult={auditResult} isAuditing={isAuditing} />
+
+              <Step2AuditReport
+                auditResult={auditResult}
+                isAuditing={isAuditing}
+              />
+
               <Step3Settlement
                 auditResult={auditResult}
                 onExecuteSettlement={handleExecuteEscrowSettlement}
@@ -401,57 +358,96 @@ export default function Home() {
           </div>
         )}
 
-        {/* Multi-Track Architecture Highlights for Hackathon Evaluation */}
+        {/* TAB 3: Atomic PTB Settlements */}
+        {activeTab === "splitter" && (
+          <BillSplitter
+            currentPersona={currentPersona}
+            activePool={activePool}
+            onSettleBillMember={handleSettleBillMember}
+            onCreateNewBill={() => {}}
+            isSettling={isExecuting}
+          />
+        )}
+
+        {/* TAB 4: Merchant & Club POS QR Codes */}
+        {activeTab === "pos" && (
+          <MerchantPOS
+            currentPersona={currentPersona}
+            onSimulateCustomerPayment={handleConfirmPOSPayment}
+            isExecutingPayment={isExecuting}
+          />
+        )}
+
+        {/* TAB 5: Team Ledger & AdminCap Arbitrator */}
+        {activeTab === "ledger" && (
+          <GroupLedger
+            currentPersona={currentPersona}
+            activePool={activePool}
+            onAdminResolveDispute={() => {}}
+            onAdminWithdrawDues={() => {}}
+            onAdminCloseTab={() => {}}
+          />
+        )}
+
+        {/* Multi-Track Architecture Highlights for MUBA Hacks 2026 Evaluation */}
         <div className="rounded-3xl border border-slate-800/80 bg-slate-900/50 p-6 backdrop-blur-xl shadow-xl">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-4 h-4 text-emerald-400" />
             <h3 className="text-xs font-bold text-white font-mono uppercase tracking-wider">
-              Core Technical Architecture Verification
+              MUBA Hacks 2026 Architectural Evaluation Matrix
             </h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
             <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/90">
               <div className="flex items-center gap-2 text-sky-400 font-bold mb-1">
                 <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-                Instant zkLogin
+                Sui Track 01: Stablecoins
               </div>
               <p className="text-slate-400 text-[11px]">
-                Google OAuth + Groth16 zkProof deriving deterministic Sui address with zero browser extensions.
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/90">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold mb-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                Gasless Settlements
-              </div>
-              <p className="text-slate-400 text-[11px]">
-                Operational gas station endpoint (<code className="text-emerald-300">/api/sponsor</code>) paying SUI fees so users only spend USDC.
+                Zero-friction zkLogin, gas-sponsored relayer (<code className="text-sky-300">/api/sponsor</code>), and atomic 90/10 milestone splits in testnet USDC.
               </p>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/90">
               <div className="flex items-center gap-2 text-indigo-400 font-bold mb-1">
                 <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                Atomic PTBs (&lt;500ms)
+                Sui Track 02: AI × Sui
               </div>
               <p className="text-slate-400 text-[11px]">
-                Bundles SplitCoins, payer reimbursement, club dues, and Move calls in a single atomic execution.
+                Dynamic PTB builder translating deliverable audits into on-chain Move calls with embedded Gonka Request IDs.
               </p>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/90">
               <div className="flex items-center gap-2 text-purple-400 font-bold mb-1">
                 <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-                Dynamic POS QRs
+                Gonka Track: AI for Society
               </div>
               <p className="text-slate-400 text-[11px]">
-                Merchant/Club POS terminal generating dynamic QRs and integrated live camera scanner.
+                Impartial verification via Gonka Router (<code className="text-purple-300">gonkarouter.io</code>) preventing SME ghosting and guaranteeing fair payouts.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/90">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold mb-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                Talent Model v3.0
+              </div>
+              <p className="text-slate-400 text-[11px]">
+                Individual university talent verification, client asset repository (raw video), and automated project reports.
               </p>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Verifiable Student Portfolio Modal */}
+      <StudentPortfolioModal
+        isOpen={isPortfolioOpen}
+        onClose={() => setIsPortfolioOpen(false)}
+        student={currentPersona}
+        completedJobs={jobs.filter((j) => j.status === "settled")}
+      />
 
       {/* zkLogin Authentication Modal */}
       <ZkLoginModal
@@ -469,7 +465,7 @@ export default function Home() {
         isExecuting={isExecuting}
       />
 
-      {/* High-Tech Settlement Receipt Modal */}
+      {/* Settlement Receipt Modal */}
       {receiptData && (
         <ReceiptModal
           isOpen={receiptData.isOpen}
