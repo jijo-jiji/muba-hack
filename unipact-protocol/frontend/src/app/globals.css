@@ -2,69 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Light theme only, on purpose. One background colour, one text colour, borders
+  instead of shadows. No gradients, no glows and no animation beyond a plain
+  spinner while something is loading.
+*/
+
 :root {
-  --background: #090d16;
-  --foreground: #f1f5f9;
+  --page: #fafaf9;
+  --ink: #1c1917;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  background: var(--page);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
-  background-image: 
-    radial-gradient(ellipse at 15% 0%, rgba(16, 185, 129, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 10%, rgba(77, 162, 255, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 90%, rgba(168, 85, 247, 0.08) 0%, transparent 50%);
-  background-attachment: fixed;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Headings never go above 600, and never above 500 below 32px. */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+::selection {
+  background: #e7e5e4;
+  color: #1c1917;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.8);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 1);
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 25px rgba(16, 185, 129, 0.5);
-  }
-}
-
-.pulse-glow {
-  animation: pulseGlow 2.5s infinite ease-in-out;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.shimmer-text {
-  background: linear-gradient(90deg, #34d399 0%, #38bdf8 50%, #c084fc 100%);
-  background-size: 200% auto;
-  color: transparent;
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: shimmer 4s linear infinite;
+/* Keyboard focus stays visible everywhere. */
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }

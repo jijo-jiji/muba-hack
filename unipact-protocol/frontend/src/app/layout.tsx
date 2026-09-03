@@ -1,32 +1,28 @@
 import type { Metadata } from "next";
-import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
-
-const robotoMono = Roboto_Mono({
-  subsets: ["latin"],
-  variable: "--font-roboto-mono",
-});
+import { readSession } from "@/lib/auth/session";
+import { SessionProvider } from "@/components/shared/SessionProvider";
 
 export const metadata: Metadata = {
-  title: "UniPact | AI-Audited Freelance Milestone & Settlement Protocol",
+  title: "TrustMesh",
   description:
-    "Zero-friction freelance escrow engine powered by Sui zkLogin, Gonka AI multi-model verification, and gas-sponsored atomic PTB settlements.",
+    "Companies fund a project up front, students do the work, and the payment releases itself once the work is checked.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+/*
+  Fonts are not fetched at build time. next/font pulls from Google Fonts while
+  building, which fails without a network connection, and we would rather not
+  find that out the night before the deadline. Inter is used if the machine has
+  it, otherwise the system sans stack.
+*/
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const account = readSession();
+
   return (
-    <html lang="en" className={`${inter.variable} ${robotoMono.variable}`}>
-      <body className="font-sans antialiased bg-[#090d16] text-slate-100 min-h-screen">
-        {children}
+    <html lang="en">
+      <body className="min-h-screen bg-page font-sans text-ink antialiased">
+        <SessionProvider account={account}>{children}</SessionProvider>
       </body>
     </html>
   );
