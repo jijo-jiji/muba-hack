@@ -58,10 +58,16 @@ export function canViewAssets(account: Maybe<Account>, job: Maybe<Job>): boolean
   return is(account, "admin") || ownsJob(account, job) || isAssignedTo(account, job);
 }
 
-/** Send the finished work in. Only the student who was given the job. */
+/**
+ * Send the finished work in. Only the student who was given the job, and only
+ * while the job is waiting for work: either it has just been assigned, or a
+ * previous submission did not pass and they are trying again.
+ */
 export function canSubmitDeliverable(account: Maybe<Account>, job: Maybe<Job>): boolean {
   if (!job) return false;
-  return is(account, "student") && isAssignedTo(account, job) && job.status === "assigned";
+  const needsWork =
+    job.status === "assigned" || (job.status === "audited" && job.audit?.isApproved === false);
+  return is(account, "student") && isAssignedTo(account, job) && needsWork;
 }
 
 /** Start the AI review. The student does this on their own submission. */
