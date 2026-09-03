@@ -34,3 +34,6 @@ unipact-protocol/frontend/.trustmesh-data.json
 
 # Local Claude Code helpers
 .claude/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
