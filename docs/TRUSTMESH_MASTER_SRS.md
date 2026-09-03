@@ -43,9 +43,9 @@ graph TD
 
 | Track | Integration in TrustMesh | Verification & Proof |
 | :--- | :--- | :--- |
-| **Sui Track 01**<br>*(Payments & Stablecoins)* | • **Zero-Friction zkLogin**: Google OAuth login with ephemeral Ed25519 keypair and Groth16 zero-knowledge proof.<br>• **Gasless Relayer (`/api/sponsor`)**: Operational gas pool pays SUI fees; students and clients only spend testnet USDC.<br>• **Atomic $1 \rightarrow N$ PTB Payout**: Programmable Transaction Block splits funds atomically (90% student, 10% platform fee, or multi-student team split) in $<500$ms. | • Sui Explorer / SuiScan transaction links.<br>• Sub-500ms latency timer and gasless receipt modal. |
+| **Sui Track 01**<br>*(Payments & Stablecoins)* | • **Zero-Friction zkLogin**: Google OAuth login with ephemeral Ed25519 keypair and Groth16 zero-knowledge proof.<br>• **Gasless Relayer (`/api/sponsor`)**: Operational gas pool pays SUI fees; students and clients only spend testnet USDC.<br>• **Atomic one-to-many PTB Payout**: Programmable Transaction Block splits funds atomically (90% student, 10% platform fee, or multi-student team split) in under 500ms. | • Sui Explorer / SuiScan transaction links.<br>• Sub-500ms latency timer and gasless receipt modal. |
 | **Sui Track 02**<br>*(AI × Sui Copilot)* | • **Autonomous Execution Copilot**: Dynamic PTB builder translates unstructured milestone deliverables and Gonka audit verdicts into valid Sui PTB execution blocks with embedded Gonka Request IDs. | • Step-by-step PTB Command Inspector in UI.<br>• Smart contract event logs containing verification metadata. |
-| **Gonka Track**<br>*(AI for Society)* | • **Impartial Milestone Audit**: Eliminates SME ghosting and protects student freelancers using Gonka Router (`gonkarouter.io`).<br>• **Dual-Model Audit**: Model 1 (Scope Compliance & Acceptance Criteria) + Model 2 (Code/Content Quality & Authenticity).<br>• **Gonka Settlement Gate**: Score $\ge 80\%$ unlocks release; Score $< 80\%$ provides actionable forensic feedback. | • Verifiable canonical Gonka Request IDs (e.g. `gnk-req-2026-trustmesh-4981`).<br>• Reasoning trace with itemized findings. |
+| **Gonka Track**<br>*(AI for Society)* | • **Impartial Milestone Audit**: Eliminates SME ghosting and protects student freelancers using Gonka Router (`gonkarouter.io`).<br>• **Dual-Model Audit**: Model 1 (Scope Compliance & Acceptance Criteria) + Model 2 (Code/Content Quality & Authenticity).<br>• **Gonka Settlement Gate**: Score 80% or above unlocks release; Score below 80% provides actionable forensic feedback. | • Verifiable canonical Gonka Request IDs (e.g. `gnk-req-2026-trustmesh-4981`).<br>• Reasoning trace with itemized findings. |
 
 ---
 
@@ -86,7 +86,7 @@ graph TD
 - **FR-1.1 Ephemeral Session**: Generates ephemeral Ed25519 keypair and creates a maximum-epoch expiration constraint.
 - **FR-1.2 OpenID Connect**: Authenticates user via Google OAuth 2.0 to retrieve signed JWT nonce.
 - **FR-1.3 ZK Proof & Address Derivation**: Computes Groth16 zero-knowledge proof binding ephemeral public key to user email salt, deriving deterministic Sui address.
-- **FR-1.4 Gasless Relayer (`/api/sponsor`)**: Backend relayer attaches sponsor gas coin, signs transaction as `gas_payer`, and returns dual-sign payload. User pays $0$ SUI gas.
+- **FR-1.4 Gasless Relayer (`/api/sponsor`)**: Backend relayer attaches sponsor gas coin, signs transaction as `gas_payer`, and returns dual-sign payload. User pays 0 SUI gas.
 
 ### Module 2: Job Posting & Client Asset Repository
 - **FR-2.1 Two Project Scopes**:
@@ -100,16 +100,16 @@ graph TD
   - **Audit Call 1 (Scope Compliance)**: Checks submission against acceptance criteria.
   - **Audit Call 2 (Code/Content Quality)**: Flags placeholder code (TODOs), dummy files, broken links, direct template duplication.
 - **FR-3.2 Verification Output**:
-  - **Truth Score**: Integer ($0 \le \text{Score} \le 100$).
+  - **Truth Score**: Integer (0 to 100).
   - **Reasoning Trace**: Bulleted list of verified items and deficiencies.
   - **Gonka Request ID**: Canonical audit string (e.g. `gnk-req-2026-trustmesh-8821`).
 - **FR-3.3 Settlement Gate**:
-  - If $\text{Score} \ge 80$, the UI enables the "Authorize Audited Release" button.
-  - If $\text{Score} < 80$, the release button is locked, displaying actionable feedback.
+  - If the score is 80 or above, the UI enables the "Authorize Audited Release" button.
+  - If the score is below 80, the release button is locked, displaying actionable feedback.
 
 ### Module 4: Atomic PTB Settlement & Payout Routing
 - **FR-4.1 Dynamic PTB Construction**: Converts approved audit results into a Sui PTB:
-  - Validates Truth Score $\ge 80$.
+  - Validates Truth Score 80 or above.
   - Deducts 10% protocol fee routed to TrustMesh Treasury.
   - Routes 90% milestone payout to student zkLogin address (or splits among multi-student team members).
   - Emits `MilestoneAuditedEvent` on-chain with the canonical Gonka Request ID.
@@ -198,7 +198,7 @@ module trustmesh::escrow {
 ```
 
 ### 4.2 Module `trustmesh::group_pool` (Team Splits & Dynamic Tabs)
-Supports multi-student project teams (e.g. 1 software developer + 1 designer, or video editor + copywriter), handling $1 \rightarrow N$ payout routing and `AdminCap` dispute arbitration.
+Supports multi-student project teams (e.g. 1 software developer + 1 designer, or video editor + copywriter), handling one-to-many payout routing and `AdminCap` dispute arbitration.
 
 ---
 

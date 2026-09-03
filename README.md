@@ -1,97 +1,94 @@
-# TrustMesh: AI-Audited Student Talent Marketplace & Trustless Escrow Protocol
+# TrustMesh
 
-> **MUBA Hacks 2026 Submission**  
-> Tracks: **Sui Track 01 (Stablecoins & Payments)** &bull; **Sui Track 02 (AI × Sui)** &bull; **Gonka Track (AI for Society)**  
-> Built with: **Sui Move** &bull; **@mysten/sui & zkLogin** &bull; **Gonka Router (gonkarouter.io)** &bull; **Next.js & TypeScript**
+Companies fund a student's project up front, and the payment releases itself once the finished work has been checked against what was asked for.
 
----
+## The problem
 
-## 🌟 Executive Overview
+Malaysian university students who take on freelance work get paid late or not at all, and they have no way to prove what they have already delivered. Small companies have the mirror problem: they do not want to pay a stranger up front for work that might never arrive, or might arrive half-finished. Both sides end up relying on trust that neither has earned yet.
 
-**TrustMesh** is an AI-audited talent marketplace and trustless settlement protocol on Sui connecting corporate clients and SMEs with individually verified university students for paid short-term project work across two high-demand scopes:
-1. **Software Development**: Building automation websites and systems (Landing Pages, ERP, HRMS, CRM, Custom Automation Tools).
-2. **Digital Marketing**: Creative campaign deliverables, client raw video asset repositories, and social video ads.
+TrustMesh removes the need for that trust. The company's money is locked before the student starts, so the student can see it is really there. The money only moves after an independent review scores the submitted work against the original brief.
 
-TrustMesh synthesizes the **TrustMesh Individual Talent Marketplace Model (SRS v3.0)** with the **UniPact AI & Web3 Escrow Engine (SRS v1.0)** to eliminate both SME ghosting/payment delays and client quality concerns.
+## How it works
 
-```mermaid
-graph TD
-    Client["🏢 Company / SME Client"] -->|"1. Post Job + Lock USDC Escrow"| SuiEscrow["🔒 Sui Escrow Vault (Shared Object)"]
-    Client -->|"2. Upload Raw Assets & Videos"| AssetRepo["📁 Client Asset Repository"]
-    Student["🎓 Verified University Student"] -->|"3. zkLogin (Google OAuth, Zero Extension)"| TrustMeshApp["🌐 TrustMesh Web Platform"]
-    Student -->|"4. Access Assets & Submit Deliverables"| TrustMeshApp
-    TrustMeshApp -->|"5. Dual-Model Forensic Audit"| GonkaRouter["🤖 Gonka Router (gonkarouter.io)"]
-    GonkaRouter -->|"6. Truth Score (≥80%) + Gonka Request ID"| SuiEscrow
-    Relayer["⛽ Operational Gas Relayer (/api/sponsor)"] -->|"7. Sponsor SUI Gas & Dual-Sign"| PTB["⚡ Atomic PTB Settlement (<500ms)"]
-    PTB -->|"8. 90% Payout"| Student
-    PTB -->|"9. 10% Protocol Fee"| Treasury["🏛️ TrustMesh Treasury"]
-    PTB -->|"10. Emits Proof & Updates"| Portfolio["⭐ Verifiable Student Portfolio"]
-```
+1. **Post and fund.** A company describes the work and locks the budget into an escrow vault on Sui. There is no such thing here as an unfunded job.
+2. **Get matched.** Students apply. The company picks one and shares the files needed to do the work.
+3. **Submit work.** The student hands in a link and a summary of what was built.
+4. **Automatic payout.** Gonka Router reviews the submission against the brief and returns a score out of 100. At 80 or above, the company releases the escrow: 90% to the student and 10% to the platform, in a single transaction. The student pays no network fee.
 
----
+## What is real and what is simulated
 
-## 🏆 MUBA Hacks 2026 Multi-Track Alignment
+We would rather say this plainly than be asked about it.
 
-### 1. Sui Track 01 (Payments & Stablecoins)
-- **Zero-Friction zkLogin**: University students onboard in 3 seconds using their standard Google account (`@apu.edu.my`) without managing seed phrases, private keys, or installing browser wallet extensions.
-- **Gasless Stablecoin Relayer (`/api/sponsor`)**: An operational SUI gas pool sponsors all network transaction fees. Students and clients only see and spend their testnet USDC balance.
-- **Atomic PTB Fee Splitting**: Each milestone release executes in a single Programmable Transaction Block (PTB) routing 90% to the student and 10% to the platform treasury in $<500$ms.
+| Part | Status |
+| :--- | :--- |
+| Move escrow contract (`release_audited_milestone`, 90/10 split, score gate, event) | Real code, compiles and is ready to deploy |
+| Sponsored transaction flow (user signs, relayer pays the fee, both signatures sent together) | Real code end to end |
+| On-chain transactions | **Not yet.** No package is deployed and the sponsor wallet is unfunded, so nothing has been broadcast. The app says so on screen and shows no transaction digest or explorer link. |
+| Gonka Router review | Real API integration. Without an API key it returns canned results, which the UI labels "Demo data, not a live Gonka call". |
+| Sign-in | Simulated. Picking a demo account sets a cookie. Real zkLogin would verify a Google ID token server-side. Addresses are real Sui addresses derived from fixed seeds. |
+| Client files | Names only. File contents are not uploaded or stored. |
+| USDC balances | Derived from the job records, not read from chain. |
+| Job storage | A JSON file on the dev server, shared between browser windows. Not a database. |
 
-### 2. Sui Track 02 (AI × Sui Copilot)
-- **Autonomous Execution PTB Builder**: Dynamically transforms unstructured deliverable proofs and Gonka AI audit outputs into verified Sui Move calls with embedded Gonka Request IDs.
+Nothing in the app invents data to fill an empty screen. Where there is nothing, it says so.
 
-### 3. Gonka Track (AI for Society)
-- **Impartial Forensic Audit via Gonka Router (`gonkarouter.io`)**: Mitigates SME ghosting and protects student talent through dual-model parallel verification:
-  - **Audit Call 1 (Scope Adherence)**: Verifies deliverables against the agreed acceptance criteria.
-  - **Audit Call 2 (Code/Content Quality)**: Scans for placeholder code (TODOs), dummy assets, and template duplication.
-- **Cryptographic Gate**: Enforces a minimum Truth Score of $80\%$ to enable milestone release, producing canonical Gonka Request IDs (e.g. `gnk-req-2026-trustmesh-pass`).
+## Track alignment
 
----
+**Sui Track 01 — Payments and Stablecoins.** The escrow release is one transaction that pays two parties from one vault: `unipact-protocol/contracts/sources/trustmesh_escrow.move`. Users never hold SUI, because `src/app/api/sponsor/route.ts` attaches the relayer's gas coin and signs for it, and `src/hooks/useDualSignSponsoredTx.ts` sends the user's signature and the relayer's together. Accounts are addressed by zkLogin-style derived addresses rather than a browser wallet extension (`src/lib/zklogin.ts`).
 
-## 📦 Core Technical Architecture
+**Sui Track 02 — AI x Sui.** The AI review's output is what authorises the on-chain call. The Gonka request id and the score are passed into `release_audited_milestone` as Move arguments, and the contract itself rejects any score below 80, so the gate is enforced on chain rather than in the UI. The emitted `MilestoneAuditedEvent` carries the request id, meaning any payout can be traced back to the specific review that justified it.
 
-### 1. Sui Move Smart Contracts (`unipact-protocol/contracts/sources/`)
-- `trustmesh_escrow.move`:
-  - `EscrowVault<T>`: Shared object holding corporate client deposits.
-  - `MilestoneAuditedEvent`: On-chain proof storing `gonka_request_id`, `truth_score`, and payout details.
-  - `release_audited_milestone`: Atomic 90/10 milestone disbursement.
-  - `trustmesh::mock_usdc`: Faucet-enabled testnet stablecoin dispenser.
-- `group_pool.move`:
-  - `GroupPool`: Shared object managing multi-student team project splits and campus group tabs.
-  - `AdminCap`: Capability pattern for dispute resolution and treasury management.
+**Gonka Track — AI for Society.** The review in `src/lib/gonkaEvaluator.ts` runs two checks in parallel through Gonka Router: whether everything in the brief is present, and whether the work is genuinely finished rather than placeholders. It exists to protect students from companies that go quiet after receiving work, and companies from submissions that do not match the brief. Only the assigned student can start the review (`src/app/api/audit-milestone/route.ts`), so a company cannot re-run it until it gets an answer it prefers.
 
-### 2. Frontend & Gas Station Relayer (`unipact-protocol/frontend/`)
-- **Talent Marketplace**: Filter by Software Development (ERP/HRMS/CRM) or Digital Marketing (Raw Video Footage & Campaigns).
-- **Client Asset Repository**: Confidential repository for briefs, brand assets, and raw video files.
-- **AI Escrow Audit Engine**: Direct integration with Gonka Router API.
-- **Verifiable Student Portfolio**: Shareable public profiles with cryptographic Gonka audit certificates and automated Project Report PDF downloads.
-- **Merchant & Club POS QR Terminal**: Dynamic payment QR code generator and live mobile camera scanner.
+## Deployed addresses
 
----
+Nothing is deployed yet. This section must be filled in before submission:
 
-## 🚀 Getting Started
+| | |
+| :--- | :--- |
+| Sui package ID | not yet deployed |
+| Escrow vault object ID | not yet created |
+| Treasury address | not yet set |
+| Example transaction | none — no transaction has been broadcast |
 
-### Run Frontend & Relayer
+Until these are filled in, the app will not display a transaction digest or an explorer link anywhere, because there is nothing real to link to.
+
+## Running it locally
+
 ```bash
 cd unipact-protocol/frontend
 npm install
+cp .env.example .env.local
 npm run dev
 ```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
-### Test Smart Contracts (Sui Move)
+Open http://localhost:3000. Sign in as a company in one browser window and as a student in another; the two windows share the same job list.
+
+Environment variables are documented in `unipact-protocol/frontend/.env.example`. The app runs with all of them blank — it just cannot reach Sui, and the review returns canned results, both of which it states on screen.
+
+To build the Move package:
+
 ```bash
 cd unipact-protocol/contracts
 sui move build
-sui move test
 ```
 
----
+To reset the demo back to its starting jobs, delete `unipact-protocol/frontend/.trustmesh-data.json`.
 
-## 👥 Hackathon Team & Evaluation Personas
-Switch personas instantly in the top-right header:
-- **Bob Lee**: Verified Student Engineer (Asia Pacific University) &bull; Pending milestone & portfolio.
-- **Alice Tan**: Corporate Project Sponsor &bull; Apex Retail Solutions.
-- **Charlie Wong**: Digital Marketing Talent (Multimedia University).
-- **Dave's Campus Cafe**: Merchant POS Stall.
-- **Eva**: TrustMesh Platform Treasurer.
+## Team
+
+| Name | Role |
+| :--- | :--- |
+| _to fill in_ | _to fill in_ |
+| _to fill in_ | _to fill in_ |
+| _to fill in_ | _to fill in_ |
+| _to fill in_ | _to fill in_ |
+
+## AI tools used
+
+Required by the organizers. Every tool used on this project:
+
+- **Claude (Anthropic)** — generated the initial codebase in the first two commits, and carried out the refactor from commit `8a5b683` onwards: removing fabricated transaction digests, deleting unused features, adding the session and permission layer, splitting the app into company and student routes, rebuilding the design system, and rewriting this README.
+- **Gonka Router** — used at runtime as the product's own AI review, not as a development tool.
+
+If any team member used another assistant, add it to this list before submitting.
