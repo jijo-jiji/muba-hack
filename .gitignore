@@ -31,3 +31,6 @@ Thumbs.db
 
 # Local demo job store (server-side shared state)
 unipact-protocol/frontend/.trustmesh-data.json
+
+# Local Claude Code helpers
+.claude/
