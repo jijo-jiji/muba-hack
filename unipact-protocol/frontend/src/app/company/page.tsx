@@ -37,7 +37,7 @@ export default function CompanyDashboard() {
           <Stat
             label="Waiting on you"
             value={String(awaitingYou)}
-            note={awaitingYou === 1 ? "1 job is reviewed and ready to pay" : "jobs reviewed and ready to pay"}
+            note={awaitingYou === 1 ? "job reviewed and ready to pay" : "jobs reviewed and ready to pay"}
           />
         </CardBody>
       </Card>

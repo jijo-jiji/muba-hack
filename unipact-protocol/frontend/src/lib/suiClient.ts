@@ -17,9 +17,16 @@ export const USDC_COIN_TYPE = `${PACKAGE_ID}::mock_usdc::MOCK_USDC`;
  * so we check the shape before trying to talk to the chain. Everything that
  * would broadcast a transaction is gated on this being true.
  */
-function isRealObjectId(value: string): boolean {
+export function isRealObjectId(value: string): boolean {
   return /^0x[0-9a-fA-F]{64}$/.test(value) && !/^0x0+$/.test(value);
 }
+
+/**
+ * A Sui account address has the same shape as an object id. Use this before
+ * displaying a configured address, so a placeholder like
+ * "0x_unipact_treasury_address_here" is never rendered as if it were real.
+ */
+export const isRealAddress = isRealObjectId;
 
 /** True only when a real escrow package and vault have been deployed and configured. */
 export function isEscrowDeployed(): boolean {
