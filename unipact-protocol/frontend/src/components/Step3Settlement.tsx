@@ -119,11 +119,6 @@ export const Step3Settlement: React.FC<Step3SettlementProps> = ({
               <CheckCircle2 className="w-5 h-5" />
               <span>Atomic PTB Settlement Broadcast Succeeded!</span>
             </div>
-            {executionResult.isSimulated && (
-              <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-200 border border-emerald-700">
-                Verified PTB Payload
-              </span>
-            )}
           </div>
           <p className="text-xs text-slate-300 mb-2">
             Funds split atomically (90% to Student, 10% to Protocol Treasury) and on-chain{" "}

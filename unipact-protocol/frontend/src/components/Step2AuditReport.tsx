@@ -80,6 +80,13 @@ export const Step2AuditReport: React.FC<Step2AuditReportProps> = ({
           : "border-red-500/40 bg-slate-900/70"
       }`}
     >
+      {/* Anything that did not come from a real Gonka Router response says so, loudly. */}
+      {!auditResult.isLiveGonkaCall && (
+        <div className="mb-4 px-3 py-2 rounded-lg border border-amber-500/50 bg-amber-950/40 text-amber-300 text-xs font-mono">
+          Demo data, not a live Gonka call.
+        </div>
+      )}
+
       <div className="flex items-center justify-between pb-4 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
           <div

@@ -30,6 +30,7 @@ import {
 import { INITIAL_PERSONAS } from "@/lib/zklogin";
 import { INITIAL_TRUSTMESH_JOBS, INITIAL_GROUP_POOLS } from "@/lib/mockData";
 import { useDualSignSponsoredTx } from "@/hooks/useDualSignSponsoredTx";
+import { buildSplitRepaymentPTB, buildMerchantPaymentPTB } from "@/lib/ptbBuilder";
 import { Sparkles, Shield, Layers, Zap, Store, Users, Briefcase, Award } from "lucide-react";
 
 export default function Home() {
@@ -54,10 +55,10 @@ export default function Home() {
     payerAmount: number;
     duesAmount: number;
     payerName: string;
-    digest: string;
+    digest?: string;
     executionTimeMs: number;
     isGasSponsored: boolean;
-    explorerUrl: string;
+    explorerUrl?: string;
   } | null>(null);
 
   // Group Pool Shared Object State (for Team Splits)
@@ -73,8 +74,7 @@ export default function Home() {
 
   // Sponsored PTB Hook
   const {
-    executeBillRepayment,
-    executeMerchantPayment,
+    executeSponsoredTransaction,
     executeReleaseAuditedMilestone,
     isExecuting,
   } = useDualSignSponsoredTx();
@@ -206,15 +206,15 @@ export default function Home() {
   // Team Split PTB Handler
   const handleSettleBillMember = async (bill: Bill, repayAmount: number, duesAmount: number) => {
     try {
-      const res = await executeBillRepayment(
-        {
+      const res = await executeSponsoredTransaction(
+        buildSplitRepaymentPTB({
           poolId: activePool.id,
           billId: bill.id,
           payerAddress: bill.payerAddress,
           clubTreasuryAddress: activePool.clubTreasury,
           memberRepayAmountUsdc: repayAmount,
           clubDueAmountUsdc: duesAmount,
-        },
+        }),
         currentPersona.keypair
       );
 
@@ -245,14 +245,14 @@ export default function Home() {
   // POS Payment Handler
   const handleConfirmPOSPayment = async (payload: MerchantQRPayload) => {
     try {
-      const res = await executeMerchantPayment(
-        {
+      const res = await executeSponsoredTransaction(
+        buildMerchantPaymentPTB({
           merchantAddress: payload.merchantAddress,
           totalAmountUsdc: payload.amount,
           clubTreasuryAddress: activePool.clubTreasury,
           clubDueAmountUsdc: payload.clubDues,
           itemDescription: payload.title,
-        },
+        }),
         currentPersona.keypair
       );
 

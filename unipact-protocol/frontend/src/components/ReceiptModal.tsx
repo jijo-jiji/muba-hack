@@ -12,10 +12,10 @@ interface ReceiptModalProps {
   payerAmount: number;
   duesAmount: number;
   payerName: string;
-  digest: string;
+  digest?: string;
   executionTimeMs: number;
   isGasSponsored: boolean;
-  explorerUrl: string;
+  explorerUrl?: string;
 }
 
 export function ReceiptModal({
@@ -95,7 +95,7 @@ export function ReceiptModal({
             <span className="text-emerald-400 flex items-center gap-1.5">
               <Zap className="w-3.5 h-3.5" /> Execution Latency:
             </span>
-            <span className="text-white font-bold">{executionTimeMs} ms (&lt;500ms PTB)</span>
+            <span className="text-white font-bold">{executionTimeMs} ms</span>
           </div>
 
           {isGasSponsored && (
@@ -108,17 +108,23 @@ export function ReceiptModal({
           )}
         </div>
 
-        {/* Transaction Digest & Explorer Button */}
+        {/* A digest and explorer link only ever appear for a real confirmed transaction. */}
         <div className="space-y-3">
-          <a
-            href={explorerUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold flex items-center justify-center gap-2 border border-slate-700 transition"
-          >
-            <span>View on SuiScan Explorer</span>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-          </a>
+          {digest && explorerUrl ? (
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold flex items-center justify-center gap-2 border border-slate-700 transition"
+            >
+              <span>View on SuiScan Explorer</span>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+            </a>
+          ) : (
+            <div className="w-full py-3 px-4 rounded-xl bg-slate-900 text-slate-400 text-xs font-mono border border-slate-800">
+              Simulated locally. No on-chain transaction was submitted.
+            </div>
+          )}
 
           <button
             onClick={onClose}

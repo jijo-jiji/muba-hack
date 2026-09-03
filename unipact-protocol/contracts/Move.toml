@@ -7,4 +7,3 @@ Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-fram
 
 [addresses]
 trustmesh = "0x0"
-unipact = "0x0"

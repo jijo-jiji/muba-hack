@@ -1,9 +1,17 @@
+"use client";
+
 import { useState } from "react";
 import { Transaction } from "@mysten/sui/transactions";
 import { Keypair } from "@mysten/sui/cryptography";
 import { fromBase64, toBase64 } from "@mysten/sui/utils";
-import { suiClient, PACKAGE_ID, ESCROW_VAULT_ID, USDC_COIN_TYPE } from "@/lib/suiClient";
-import { buildSplitRepaymentPTB, buildMerchantPaymentPTB, BuildSplitRepaymentParams, BuildMerchantPaymentParams } from "@/lib/ptbBuilder";
+import {
+  suiClient,
+  PACKAGE_ID,
+  ESCROW_VAULT_ID,
+  USDC_COIN_TYPE,
+  isEscrowDeployed,
+  explorerUrlForDigest,
+} from "@/lib/suiClient";
 
 interface SponsorApiResponse {
   bytes: string;
@@ -12,13 +20,27 @@ interface SponsorApiResponse {
   sponsorAddress?: string;
 }
 
+/**
+ * "not_executed" means nothing was ever sent to Sui. When that is the outcome
+ * there is no digest and no explorer link, and the UI must not invent one.
+ */
+export type ExecutionStatus = "success" | "failure" | "not_executed";
+
 export interface ExecutionResult {
-  digest: string;
-  status: "success" | "failure";
-  isSimulated: boolean;
-  explorerUrl: string;
+  status: ExecutionStatus;
+  /** Present only when a transaction was broadcast and the network confirmed it. */
+  digest?: string;
+  /** Present only alongside a real digest. */
+  explorerUrl?: string;
+  /** Real measured duration of the attempt in milliseconds. Never capped or smoothed. */
   executionTimeMs: number;
-  details?: any;
+  /** Plain-language explanation of why nothing was broadcast. */
+  reason?: string;
+}
+
+function describe(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }
 
 export function useDualSignSponsoredTx() {
@@ -27,190 +49,150 @@ export function useDualSignSponsoredTx() {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Universal Dual-Signed Sponsored PTB Dispatcher
+   * Runs one sponsored transaction end to end.
+   *
+   * The flow has two signatures, which is why it is called "dual sign":
+   *  1. the user signs the action they want to take,
+   *  2. our relayer signs to say it will pay the network fee.
+   * Sui accepts both together, so the user never needs to hold SUI for gas.
+   *
+   * Every path that does not end in a confirmed on-chain transaction returns
+   * status "not_executed" with a reason. There is deliberately no fallback that
+   * makes an unexecuted transaction look successful.
    */
-  const executeGenericSponsoredPTB = async (
+  const executeSponsoredTransaction = async (
     tx: Transaction,
     userKeypair: Keypair
   ): Promise<ExecutionResult> => {
     setIsExecuting(true);
     setError(null);
     setResult(null);
-    const startTime = performance.now();
+    const startedAt = performance.now();
+
+    const finish = (outcome: ExecutionResult): ExecutionResult => {
+      setResult(outcome);
+      if (outcome.status !== "success" && outcome.reason) setError(outcome.reason);
+      return outcome;
+    };
+
+    const notExecuted = (reason: string): ExecutionResult =>
+      finish({
+        status: "not_executed",
+        executionTimeMs: Math.round(performance.now() - startedAt),
+        reason,
+      });
 
     try {
       const sender = userKeypair.toSuiAddress();
       tx.setSender(sender);
 
-      // 1. Build transaction kind bytes (with offline fallback if testnet RPC is unavailable)
+      // 1. Serialise only the "what to do" half of the transaction. The gas coin
+      //    is left out on purpose so the sponsor can attach its own.
       let txKindBase64: string;
       try {
-        const txKindBytes = await tx.build({
-          client: suiClient,
-          onlyTransactionKind: true,
-        });
-        txKindBase64 = Buffer.from(txKindBytes).toString("base64");
-      } catch (buildErr) {
-        console.warn("Client build offline fallback:", buildErr);
-        // Build kind bytes without RPC client requirement
-        try {
-          const offlineKindBytes = await tx.build({ onlyTransactionKind: true });
-          txKindBase64 = Buffer.from(offlineKindBytes).toString("base64");
-        } catch {
-          // Synthetic demo bytes fallback
-          txKindBase64 = Buffer.from(new Uint8Array(64).fill(1)).toString("base64");
-        }
+        const kindBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
+        txKindBase64 = toBase64(kindBytes);
+      } catch (buildError) {
+        return notExecuted(`The transaction could not be built: ${describe(buildError)}`);
       }
 
-      // 2. Request Gas Sponsorship from Relayer API
-      let sponsorData: SponsorApiResponse;
+      // 2. Ask our own relayer at /api/sponsor to attach gas and sign for it.
+      let sponsor: SponsorApiResponse;
       try {
-        const res = await fetch("/api/sponsor", {
+        const response = await fetch("/api/sponsor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ txBytes: txKindBase64, sender }),
         });
-
-        if (res.ok) {
-          sponsorData = await res.json();
-        } else {
-          throw new Error("Sponsor response not OK");
+        if (!response.ok) {
+          return notExecuted(`The gas sponsor service replied with HTTP ${response.status}.`);
         }
-      } catch {
-        // Ephemeral local sponsor fallback for uninterrupted demo
-        sponsorData = {
-          bytes: txKindBase64,
-          sponsorSignature: `0x_sponsor_sig_${Date.now()}`,
-          isSimulated: true,
-          sponsorAddress: "0x_unipact_gas_station_relayer",
-        };
+        sponsor = await response.json();
+      } catch (sponsorError) {
+        return notExecuted(`The gas sponsor service is unreachable: ${describe(sponsorError)}`);
       }
 
-      // 3. User signs with ephemeral zkLogin keypair
-      let userSigHex = "0x_zklogin_sig";
+      // The relayer reports honestly whether it had a funded wallet. If the flag
+      // is missing we assume the worst, so a silent failure can never read as real.
+      const isSimulated = sponsor.isSimulated ?? true;
+      if (isSimulated) {
+        return notExecuted(
+          "The sponsor wallet holds no testnet SUI, so the transaction was prepared but not broadcast."
+        );
+      }
+
+      // 3. The user signs the fully-formed sponsored bytes.
+      let userSignature: string;
       try {
-        const sponsoredBytes = fromBase64(sponsorData.bytes);
-        const userSig = await userKeypair.signTransaction(sponsoredBytes);
-        userSigHex = userSig.signature;
-      } catch (sigErr) {
-        console.warn("Signature fallback for demo:", sigErr);
+        const signed = await userKeypair.signTransaction(fromBase64(sponsor.bytes));
+        userSignature = signed.signature;
+      } catch (signError) {
+        return notExecuted(`The transaction could not be signed: ${describe(signError)}`);
       }
 
-      let digest = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`;
-      let txStatus: "success" | "failure" = "success";
-      let isSimulated = sponsorData.isSimulated || true;
+      // 4. Broadcast with both signatures attached.
+      try {
+        const execution = await suiClient.executeTransactionBlock({
+          transactionBlock: fromBase64(sponsor.bytes),
+          signature: [userSignature, sponsor.sponsorSignature],
+          options: { showEffects: true, showEvents: true },
+        });
 
-      // Broadcast on-chain if real RPC is reachable
-      if (!sponsorData.isSimulated) {
-        try {
-          const execRes = await suiClient.executeTransactionBlock({
-            transactionBlock: fromBase64(sponsorData.bytes),
-            signature: [userSigHex, sponsorData.sponsorSignature],
-            options: {
-              showEffects: true,
-              showEvents: true,
-              showObjectChanges: true,
-            },
-          });
-
-          digest = execRes.digest;
-          txStatus = execRes.effects?.status.status === "success" ? "success" : "failure";
-        } catch (chainErr: any) {
-          console.warn("Testnet broadcast fallback to simulated mode:", chainErr);
-          isSimulated = true;
-        }
+        const confirmed = execution.effects?.status.status === "success";
+        return finish({
+          status: confirmed ? "success" : "failure",
+          digest: execution.digest,
+          explorerUrl: explorerUrlForDigest(execution.digest),
+          executionTimeMs: Math.round(performance.now() - startedAt),
+          reason: confirmed ? undefined : execution.effects?.status.error,
+        });
+      } catch (broadcastError) {
+        return notExecuted(`Sui rejected the transaction: ${describe(broadcastError)}`);
       }
-
-      // Calculate realistic sub-500ms PTB latency benchmark (180ms - 380ms)
-      const rawElapsed = performance.now() - startTime;
-      const executionTimeMs = Math.min(480, Math.max(160, Math.round(rawElapsed || 240)));
-
-      const execResult: ExecutionResult = {
-        digest,
-        status: txStatus,
-        isSimulated,
-        executionTimeMs,
-        explorerUrl: `https://suiscan.xyz/testnet/tx/${digest}`,
-      };
-
-      setResult(execResult);
-      return execResult;
-    } catch (err: any) {
-      console.error("Sponsored PTB execution error:", err);
-      // Even under edge network failures, ensure zero-crash graceful completion
-      const executionTimeMs = 285;
-      const digest = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`;
-      const execResult: ExecutionResult = {
-        digest,
-        status: "success",
-        isSimulated: true,
-        executionTimeMs,
-        explorerUrl: `https://suiscan.xyz/testnet/tx/${digest}`,
-      };
-      setResult(execResult);
-      return execResult;
     } finally {
       setIsExecuting(false);
     }
   };
 
   /**
-   * Atomic Bill Repayment PTB Execution (<500ms benchmark)
-   */
-  const executeBillRepayment = async (
-    params: BuildSplitRepaymentParams,
-    userKeypair: Keypair
-  ): Promise<ExecutionResult> => {
-    const tx = buildSplitRepaymentPTB(params);
-    return executeGenericSponsoredPTB(tx, userKeypair);
-  };
-
-  /**
-   * Merchant POS Payment PTB Execution
-   */
-  const executeMerchantPayment = async (
-    params: BuildMerchantPaymentParams,
-    userKeypair: Keypair
-  ): Promise<ExecutionResult> => {
-    const tx = buildMerchantPaymentPTB(params);
-    return executeGenericSponsoredPTB(tx, userKeypair);
-  };
-
-  /**
-   * Escrow Milestone Release
+   * Releases an escrow milestone: 90% to the student, 10% to the platform treasury,
+   * in a single Move call. The Gonka request id and score are written on-chain as
+   * part of the release so the payout carries its own evidence.
    */
   const executeReleaseAuditedMilestone = async (
-    gonkaReqId: string,
+    gonkaRequestId: string,
     truthScore: number,
     userKeypair: Keypair
   ): Promise<ExecutionResult> => {
-    const sender = userKeypair.toSuiAddress();
-    const tx = new Transaction();
-    tx.setSender(sender);
-
-    const isPlaceholderPackage = !PACKAGE_ID || PACKAGE_ID.startsWith("0x0000");
-    if (!isPlaceholderPackage) {
-      tx.moveCall({
-        target: `${PACKAGE_ID}::escrow::release_audited_milestone`,
-        typeArguments: [USDC_COIN_TYPE],
-        arguments: [
-          tx.object(ESCROW_VAULT_ID),
-          tx.pure.string(gonkaReqId),
-          tx.pure.u8(truthScore),
-        ],
-      });
-    } else {
-      tx.transferObjects([tx.gas], tx.pure.address(sender));
+    if (!isEscrowDeployed()) {
+      const outcome: ExecutionResult = {
+        status: "not_executed",
+        executionTimeMs: 0,
+        reason:
+          "No escrow package is configured. Set NEXT_PUBLIC_PACKAGE_ID and NEXT_PUBLIC_ESCROW_VAULT_ID to a deployed package to release on-chain.",
+      };
+      setResult(outcome);
+      setError(outcome.reason ?? null);
+      return outcome;
     }
 
-    return executeGenericSponsoredPTB(tx, userKeypair);
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${PACKAGE_ID}::escrow::release_audited_milestone`,
+      typeArguments: [USDC_COIN_TYPE],
+      arguments: [
+        tx.object(ESCROW_VAULT_ID),
+        tx.pure.string(gonkaRequestId),
+        tx.pure.u8(truthScore),
+      ],
+    });
+
+    return executeSponsoredTransaction(tx, userKeypair);
   };
 
   return {
     executeReleaseAuditedMilestone,
-    executeBillRepayment,
-    executeMerchantPayment,
-    executeGenericSponsoredPTB,
+    executeSponsoredTransaction,
     isExecuting,
     result,
     error,

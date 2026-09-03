@@ -175,6 +175,12 @@ export interface PTBExecutionResult {
   poolId?: string;
 }
 
+/**
+ * Where an audit result came from. Only "live" means a real Gonka Router call
+ * happened; everything else is canned data kept so the demo cannot fail on stage.
+ */
+export type AuditSource = "live" | "demo_preset" | "keyword_fallback";
+
 export interface MilestoneAuditResult {
   truthScore: number;
   reasoningTrace: string[];
@@ -183,6 +189,9 @@ export interface MilestoneAuditResult {
   scopeScore?: number;
   qualityScore?: number;
   auditedAt?: string;
+  /** True only when a real Gonka Router API response produced this result. */
+  isLiveGonkaCall: boolean;
+  source: AuditSource;
 }
 
 export const DEMO_PRESETS = {
@@ -203,6 +212,8 @@ export const DEMO_PRESETS = {
       ],
       gonkaRequestId: "gnk-req-2026-trustmesh-pass",
       auditedAt: new Date().toISOString(),
+      isLiveGonkaCall: false,
+      source: "demo_preset" as AuditSource,
     },
   },
   INCOMPLETE_DELIVERABLE: {
@@ -221,6 +232,8 @@ export const DEMO_PRESETS = {
       ],
       gonkaRequestId: "gnk-req-2026-trustmesh-reject",
       auditedAt: new Date().toISOString(),
+      isLiveGonkaCall: false,
+      source: "demo_preset" as AuditSource,
     },
   },
 };
