@@ -28,3 +28,6 @@ build/
 .DS_Store
 Thumbs.db
 .vercel
+
+# Local demo job store (server-side shared state)
+unipact-protocol/frontend/.trustmesh-data.json
