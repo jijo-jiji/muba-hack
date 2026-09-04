@@ -15,12 +15,26 @@ export function AuditReport({ audit }: { audit: MilestoneAuditResult }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-wrap items-center justify-between gap-3">
-        <CardTitle>AI review</CardTitle>
-        <div className="flex items-center gap-2">
-          {!audit.isLiveGonkaCall && <Badge tone="warning">Demo data, not a live Gonka call</Badge>}
+      <CardHeader className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
+        <div>
+          <CardTitle>Gonka AI Multi-Model Audit</CardTitle>
+          <p className="text-small text-ink-soft">
+            Decentralized cross-model verification via official inference gateway (gonkarouter.io)
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {audit.consensusLevel && (
+            <Badge tone="neutral">
+              Consensus: {audit.consensusLevel} Agreement
+            </Badge>
+          )}
+          {!audit.isLiveGonkaCall ? (
+            <Badge tone="warning">Demo data, not a live Gonka call</Badge>
+          ) : (
+            <Badge tone="success">Live Multi-Model Consensus</Badge>
+          )}
           <Badge tone={passed ? "success" : "error"}>
-            {passed ? "Passed" : "Needs revision"}
+            {passed ? "Approved (≥80%)" : "Needs Revision (<80%)"}
           </Badge>
         </div>
       </CardHeader>
@@ -28,50 +42,99 @@ export function AuditReport({ audit }: { audit: MilestoneAuditResult }) {
       <CardBody className="space-y-6">
         <div>
           <div className="flex items-baseline justify-between">
-            <p className="text-small text-ink-soft">
-              Truth Score — how closely the submitted work matches what was asked for
+            <div>
+              <p className="text-body font-medium text-ink">
+                Truth Score
+              </p>
+              <p className="text-small text-ink-soft">
+                Synthesized consensus score across independent frontier model evaluations
+              </p>
+            </div>
+            <p className={`text-section font-bold ${passed ? "text-success" : "text-danger"}`}>
+              {audit.truthScore}%
             </p>
-            <p className="text-section font-semibold text-ink">{audit.truthScore}/100</p>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-page">
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-page">
             <div
-              className={passed ? "h-full bg-success" : "h-full bg-danger"}
+              className={passed ? "h-full bg-success transition-all duration-500" : "h-full bg-danger transition-all duration-500"}
               style={{ width: `${audit.truthScore}%` }}
             />
           </div>
           <p className="mt-2 text-small text-ink-faint">
-            Payment unlocks at {PASS_THRESHOLD} or above.
+            Smart contract escrow unlocks payment at {PASS_THRESHOLD}% or above.
           </p>
         </div>
 
-        {(audit.scopeScore !== undefined || audit.qualityScore !== undefined) && (
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-small text-ink-soft">Check 1 — everything asked for is there</dt>
-              <dd className="mt-1 text-card-title font-medium text-ink">{audit.scopeScore ?? "—"}/100</dd>
+        {/* Multi-Model Inference Steps & Transparency */}
+        {audit.modelSteps && audit.modelSteps.length > 0 && (
+          <div>
+            <p className="text-small font-semibold uppercase tracking-wider text-ink-soft">
+              Decentralized Inference Steps & Consensus
+            </p>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              {audit.modelSteps.map((step, idx) => (
+                <div key={idx} className="rounded-xl border border-line bg-page/50 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-small font-medium text-ink">{step.stepName}</span>
+                    <span className="text-body font-bold text-accent">{step.score}%</span>
+                  </div>
+                  <p className="text-xs font-mono text-ink-faint">
+                    Model: <span className="text-ink">{step.model}</span> {step.latencyMs ? `(${step.latencyMs}ms)` : ""}
+                  </p>
+                  {step.findings && step.findings.length > 0 && (
+                    <ul className="text-xs text-ink-soft space-y-1 list-disc pl-4 pt-1">
+                      {step.findings.slice(0, 2).map((f, fIdx) => (
+                        <li key={fIdx}>{f}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="pt-2 border-t border-line/60">
+                    <AddressChip label="Gonka Request ID" value={step.requestId} />
+                  </div>
+                </div>
+              ))}
             </div>
-            <div>
-              <dt className="text-small text-ink-soft">Check 2 — the work is finished, not placeholders</dt>
-              <dd className="mt-1 text-card-title font-medium text-ink">{audit.qualityScore ?? "—"}/100</dd>
+          </div>
+        )}
+
+        {/* Extracted Verifiable Claims */}
+        {audit.extractedClaims && audit.extractedClaims.length > 0 && (
+          <div>
+            <p className="text-small font-semibold uppercase tracking-wider text-ink-soft">
+              Extracted Factual Claims
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {audit.extractedClaims.map((claim, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center rounded-lg border border-line bg-page px-3 py-1 text-xs text-ink"
+                >
+                  ✓ {claim}
+                </span>
+              ))}
             </div>
-          </dl>
+          </div>
         )}
 
         {audit.reasoningTrace.length > 0 && (
           <div>
-            <p className="text-small font-medium text-ink">What the review found</p>
-            <ul className="mt-2 space-y-2">
+            <p className="text-small font-semibold uppercase tracking-wider text-ink-soft">
+              Consensus Reasoning Trace
+            </p>
+            <ul className="mt-2 space-y-2 rounded-xl border border-line bg-page/30 p-4">
               {audit.reasoningTrace.map((finding, index) => (
-                <li key={index} className="text-body text-ink-soft">
-                  {finding}
+                <li key={index} className="text-body text-ink-soft flex items-start gap-2">
+                  <span className="text-accent mt-0.5">•</span>
+                  <span>{finding}</span>
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        <div className="border-t border-line pt-4">
-          <AddressChip label="Gonka request ID" value={audit.gonkaRequestId} />
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs text-ink-faint">
+          <span>Inference Gateway: <code className="font-mono text-ink">api.gonkarouter.io/v1</code></span>
+          {audit.auditedAt && <span>Audited At: {new Date(audit.auditedAt).toLocaleTimeString()}</span>}
         </div>
       </CardBody>
     </Card>

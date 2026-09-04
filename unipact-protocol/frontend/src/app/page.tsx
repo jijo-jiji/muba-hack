@@ -32,6 +32,10 @@ export default function LandingPage() {
         <div className="mx-auto flex h-16 max-w-content items-center justify-between px-6">
           <span className="text-card-title font-semibold text-ink">TrustMesh</span>
           <nav className="flex items-center gap-6">
+            <Link href="/verify" className="flex items-center gap-1 text-small font-medium text-accent hover:underline">
+              <span>🔍</span>
+              <span>Gonka AI Verifier</span>
+            </Link>
             <Link href="/login" className="hidden text-body text-ink-soft hover:text-ink sm:block">
               For companies
             </Link>
@@ -52,8 +56,8 @@ export default function LandingPage() {
           </h1>
           <p className="mt-6 max-w-2xl text-body text-ink-soft">
             TrustMesh connects Malaysian companies with university students for paid project work.
-            The budget is locked before the work starts, and it is released once the finished work
-            has been checked against what was asked for.
+            The budget is locked on Sui before the work starts, and released once Gonka multi-model AI consensus
+            verifies the deliverables against the brief.
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <ButtonLink href="/login" size="lg">
@@ -61,6 +65,9 @@ export default function LandingPage() {
             </ButtonLink>
             <ButtonLink href="/login" size="lg" variant="secondary">
               I&rsquo;m a student
+            </ButtonLink>
+            <ButtonLink href="/verify" size="lg" variant="secondary">
+              Try AI Verifier
             </ButtonLink>
           </div>
         </section>

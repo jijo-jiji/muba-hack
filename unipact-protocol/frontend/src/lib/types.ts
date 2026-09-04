@@ -100,6 +100,15 @@ export interface Job {
  */
 export type AuditSource = "live" | "demo_preset" | "keyword_fallback";
 
+export interface ModelInferenceStep {
+  stepName: string;
+  model: string;
+  requestId: string;
+  score: number;
+  latencyMs?: number;
+  findings: string[];
+}
+
 export interface MilestoneAuditResult {
   /** How closely the submitted work matches what was asked for, 0 to 100. */
   truthScore: number;
@@ -110,6 +119,23 @@ export interface MilestoneAuditResult {
   qualityScore?: number;
   auditedAt?: string;
   /** True only when a real Gonka Router API response produced this result. */
+  isLiveGonkaCall: boolean;
+  source: AuditSource;
+  /** Multi-model consensus metadata */
+  modelSteps?: ModelInferenceStep[];
+  extractedClaims?: string[];
+  consensusLevel?: "High" | "Moderate" | "Divergent";
+}
+
+export interface ClaimVerificationResult {
+  inputClaim: string;
+  extractedClaims: string[];
+  truthScore: number;
+  verdict: "Verified True" | "Partially Verified" | "Unverified / False";
+  consensusLevel: "High" | "Moderate" | "Divergent";
+  modelSteps: ModelInferenceStep[];
+  reasoningTrace: string[];
+  verifiedAt: string;
   isLiveGonkaCall: boolean;
   source: AuditSource;
 }

@@ -31,10 +31,22 @@ export function AppShell({
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex h-16 max-w-content items-center justify-between gap-4 px-6">
-          <div className="flex items-center gap-4">
-            <Link href={home} className="text-card-title font-semibold text-ink">
+          <div className="flex items-center gap-6">
+            <Link href={home} className="text-card-title font-bold text-ink hover:text-accent transition-colors">
               TrustMesh
             </Link>
+            <nav className="hidden md:flex items-center gap-4 text-small">
+              <Link href={home} className="text-ink-soft hover:text-ink transition-colors font-medium">
+                Jobs & Escrow
+              </Link>
+              <Link
+                href="/verify"
+                className="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1 text-accent hover:bg-accent/20 transition-all font-medium"
+              >
+                <span>🔍</span>
+                <span>AI Verifier</span>
+              </Link>
+            </nav>
             <GonkaConfigModal />
           </div>
           <div className="flex items-center gap-4">
