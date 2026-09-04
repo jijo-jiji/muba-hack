@@ -74,10 +74,17 @@ export default function PortfolioPage({ params }: { params: { studentId: string 
                       )}
                     </div>
                     <p className="text-body text-ink-soft">{job.description}</p>
-                    <div className="flex flex-wrap items-center gap-4 border-t border-line pt-3">
-                      <span className="text-small text-ink-soft">
-                        {job.payment?.studentPayoutUsdc.toFixed(2)} USDC
-                      </span>
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-small font-medium text-ink">
+                          {job.payment?.studentPayoutUsdc.toFixed(2)} USDC
+                        </span>
+                        {job.audit?.gonkaRequestId && (
+                          <span className="text-xs text-ink-soft bg-surface-elevated px-2 py-0.5 rounded font-mono border border-border">
+                            Proof: {job.audit.gonkaRequestId.slice(0, 16)}…
+                          </span>
+                        )}
+                      </div>
                       {job.payment?.explorerUrl ? (
                         <a
                           href={job.payment.explorerUrl}

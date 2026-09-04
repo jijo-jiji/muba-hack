@@ -80,6 +80,9 @@ export interface Job {
   companyId: string;
   companyName: string;
   escrowStatus: "unfunded" | "locked" | "released";
+  escrowVaultId?: string;
+  depositTxDigest?: string;
+  depositExplorerUrl?: string;
   status: JobStatus;
   assignedStudentId?: string;
   assignedStudentName?: string;

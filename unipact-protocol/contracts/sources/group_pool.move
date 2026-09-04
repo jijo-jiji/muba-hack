@@ -1,3 +1,4 @@
+#[allow(lint(public_entry), deprecated_usage)]
 module trustmesh::group_pool {
     use sui::object::{Self, UID};
     use sui::tx_context::{Self, TxContext};

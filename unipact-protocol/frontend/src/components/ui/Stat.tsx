@@ -8,7 +8,7 @@ export function Stat({
 }: {
   label: string;
   value: ReactNode;
-  note?: string;
+  note?: ReactNode;
 }) {
   return (
     <div>

@@ -42,7 +42,8 @@ export function ReleasePayment({
     const outcome = await executeReleaseAuditedMilestone(
       job.audit.gonkaRequestId,
       job.audit.truthScore,
-      keypair
+      keypair,
+      job.escrowVaultId
     );
 
     const note =

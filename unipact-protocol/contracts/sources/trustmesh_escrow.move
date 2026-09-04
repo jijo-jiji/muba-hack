@@ -1,3 +1,4 @@
+#[allow(lint(public_entry), deprecated_usage)]
 module trustmesh::mock_usdc {
     use sui::coin::{Self, Coin, TreasuryCap};
     use sui::transfer;
@@ -31,6 +32,7 @@ module trustmesh::mock_usdc {
     }
 }
 
+#[allow(lint(public_entry), deprecated_usage)]
 module trustmesh::escrow {
     use sui::object::{Self, UID};
     use sui::tx_context::{Self, TxContext};

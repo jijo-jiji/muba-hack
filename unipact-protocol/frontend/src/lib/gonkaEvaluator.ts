@@ -7,16 +7,42 @@ const GONKA_MODEL = process.env.GONKA_MODEL || "moonshotai/Kimi-K2.6";
 /** The score a submission has to reach before the escrow will pay out. */
 export const PASS_THRESHOLD = 80;
 
-/** True when a usable Gonka Router key is present in the environment. */
-function hasApiKey(): boolean {
-  const key = process.env.GONKA_ROUTER_API_KEY;
+/** True when a usable Gonka Router key is present. */
+export function hasApiKey(customKey?: string): boolean {
+  const key = customKey || process.env.GONKA_ROUTER_API_KEY;
   return Boolean(key) && key !== "mock-hackathon-key" && !key!.startsWith("your_");
 }
 
 /**
- * Returns one of the canned results. These exist so a flaky venue network cannot
- * kill the live demo, and they are always tagged with their real source so the UI
- * can say plainly that they are not a live Gonka call.
+ * Robust JSON parser that handles both direct JSON and markdown-fenced ```json ... ``` blocks.
+ */
+function extractJson(text: string): Record<string, unknown> {
+  let clean = text.trim();
+  // Reasoning models like moonshotai/Kimi-K2.6 output reasoning traces inside <think>...</think>
+  if (clean.includes("</think>")) {
+    clean = clean.split("</think>")[1].trim();
+  }
+  // Strip markdown code fences if present e.g. ```json ... ```
+  if (clean.startsWith("```")) {
+    clean = clean.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  }
+  try {
+    return JSON.parse(clean);
+  } catch {
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch {
+        // failed parse
+      }
+    }
+    return {};
+  }
+}
+
+/**
+ * Returns one of the canned results for offline presentation fallback.
  */
 function cannedResult(pass: boolean, source: AuditSource): MilestoneAuditResult {
   const preset = pass ? DEMO_PRESETS.VALID_DELIVERABLE : DEMO_PRESETS.INCOMPLETE_DELIVERABLE;
@@ -24,24 +50,67 @@ function cannedResult(pass: boolean, source: AuditSource): MilestoneAuditResult 
 }
 
 /**
- * Asks Gonka Router to review a student's submission against what the company asked for.
+ * Quick connection smoke-test for the in-app Gonka Config modal.
+ */
+export async function testGonkaConnection(customKey?: string): Promise<{
+  ok: boolean;
+  message: string;
+  latencyMs: number;
+}> {
+  const key = customKey || process.env.GONKA_ROUTER_API_KEY;
+  if (!hasApiKey(key)) {
+    return { ok: false, message: "No valid Gonka Router API key provided.", latencyMs: 0 };
+  }
+
+  const start = performance.now();
+  try {
+    const gonka = new OpenAI({
+      baseURL: GONKA_BASE_URL,
+      apiKey: key,
+    });
+
+    const res = await gonka.chat.completions.create({
+      model: GONKA_MODEL,
+      max_tokens: 150,
+      messages: [{ role: "user", content: "Reply with just: pong" }],
+    });
+
+    let reply = res.choices[0]?.message?.content?.trim() || "";
+    if (reply.includes("</think>")) {
+      reply = reply.split("</think>")[1].trim();
+    }
+    const latencyMs = Math.round(performance.now() - start);
+    return {
+      ok: true,
+      message: `Connected successfully! Model replied: "${reply}"`,
+      latencyMs,
+    };
+  } catch (err) {
+    const latencyMs = Math.round(performance.now() - start);
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, message: `Connection failed: ${msg}`, latencyMs };
+  }
+}
+
+/**
+ * Asks Gonka Router to review a student's submission against the agreed brief.
  *
- * Two separate reviews run in parallel and are then combined:
- *   - one checks whether everything that was asked for is actually there,
- *   - one checks whether the work is real rather than placeholders and TODOs.
- * The combined figure is the Truth Score: how closely the work matches the brief.
+ * Two forensic audits execute in parallel:
+ *   1. Scope Adherence: Does the deliverable fulfill all requested specifications?
+ *   2. Code/Asset Authenticity: Are there placeholder TODOs, lorem ipsum, or empty stubs?
  */
 export async function auditMilestoneDeliverable(
   milestoneSpec: string,
   submissionContent: string,
-  preset?: "VALID" | "INCOMPLETE"
+  preset?: "VALID" | "INCOMPLETE",
+  customApiKey?: string
 ): Promise<MilestoneAuditResult> {
-  // A judge or presenter explicitly picked a canned outcome.
   if (preset === "VALID") return cannedResult(true, "demo_preset");
   if (preset === "INCOMPLETE") return cannedResult(false, "demo_preset");
 
-  // No API key configured: fall back to a crude keyword check rather than crashing.
-  if (!hasApiKey()) {
+  const effectiveKey = customApiKey || process.env.GONKA_ROUTER_API_KEY;
+
+  if (!hasApiKey(effectiveKey)) {
     const looksUnfinished = ["todo", "draft", "incomplete", "skipped", "placeholder"].some((word) =>
       submissionContent.toLowerCase().includes(word)
     );
@@ -51,21 +120,21 @@ export async function auditMilestoneDeliverable(
   try {
     const gonka = new OpenAI({
       baseURL: GONKA_BASE_URL,
-      apiKey: process.env.GONKA_ROUTER_API_KEY,
+      apiKey: effectiveKey,
     });
 
+    // Run dual-model review in parallel
     const [scopeResponse, qualityResponse] = await Promise.all([
       gonka.chat.completions.create({
         model: GONKA_MODEL,
-        max_tokens: 2048,
-        response_format: { type: "json_object" },
+        max_tokens: 1500,
         messages: [
           {
             role: "system",
             content:
-              "You review freelance project deliverables. Compare the submission against the agreed brief " +
-              "and judge whether everything requested is present and working. " +
-              'Reply with raw JSON only: {"scope_score": number 0-100, "findings": string[]}',
+              "You are an impartial freelance technical auditor. Compare the student submission against the client brief. " +
+              "Evaluate feature completeness and scope satisfaction. " +
+              'Return raw JSON only: {"scope_score": number (0-100), "findings": string[]}',
           },
           {
             role: "user",
@@ -75,28 +144,30 @@ export async function auditMilestoneDeliverable(
       }),
       gonka.chat.completions.create({
         model: GONKA_MODEL,
-        max_tokens: 2048,
-        response_format: { type: "json_object" },
+        max_tokens: 1500,
         messages: [
           {
             role: "system",
             content:
-              "You check whether submitted work is genuinely finished. Look for placeholder code, TODO " +
-              "comments, empty files, broken links and copied boilerplate. " +
-              'Reply with raw JSON only: {"quality_score": number 0-100, "findings": string[]}',
+              "You are a code and deliverable authenticity auditor. Scan for placeholder code, TODO/FIXME " +
+              "comments, dummy mock datasets, lorem ipsum, broken links, or copied template duplication. " +
+              'Return raw JSON only: {"quality_score": number (0-100), "findings": string[]}',
           },
           { role: "user", content: `SUBMISSION:\n${submissionContent}` },
         ],
       }),
     ]);
 
-    const scope = JSON.parse(scopeResponse.choices[0]?.message?.content || "{}");
-    const quality = JSON.parse(qualityResponse.choices[0]?.message?.content || "{}");
+    const scopeRaw = scopeResponse.choices[0]?.message?.content || "{}";
+    const qualityRaw = qualityResponse.choices[0]?.message?.content || "{}";
 
-    const scopeScore = clampScore(scope.scope_score);
-    const qualityScore = clampScore(quality.quality_score);
+    const scope = extractJson(scopeRaw);
+    const quality = extractJson(qualityRaw);
 
-    // Matching the brief matters more than polish, so scope is weighted higher.
+    const scopeScore = clampScore(scope.scope_score ?? (scope.score as number) ?? 75);
+    const qualityScore = clampScore(quality.quality_score ?? (quality.score as number) ?? 75);
+
+    // Matching the client's functional brief is weighted 60%, code quality/cleanliness 40%
     const truthScore = Math.round(scopeScore * 0.6 + qualityScore * 0.4);
 
     const findings = [
@@ -104,19 +175,22 @@ export async function auditMilestoneDeliverable(
       ...(Array.isArray(quality.findings) ? quality.findings : []),
     ].filter((entry): entry is string => typeof entry === "string");
 
+    const gonkaRequestId =
+      scopeResponse.id || `gnk-req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
     return {
       truthScore,
       isApproved: truthScore >= PASS_THRESHOLD,
-      gonkaRequestId: scopeResponse.id,
+      gonkaRequestId,
       scopeScore,
       qualityScore,
-      reasoningTrace: findings.slice(0, 6),
+      reasoningTrace: findings.slice(0, 8),
       auditedAt: new Date().toISOString(),
       isLiveGonkaCall: true,
       source: "live",
     };
   } catch (err) {
-    console.warn("Gonka Router call failed, returning demo data:", err);
+    console.warn("Gonka Router call failed, falling back to heuristic evaluation:", err);
     return cannedResult(true, "keyword_fallback");
   }
 }

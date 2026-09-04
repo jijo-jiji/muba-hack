@@ -6,6 +6,8 @@ import { Account } from "@/lib/types";
 import { Avatar } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { AddressChip } from "@/components/ui/AddressChip";
+import { FaucetWidget } from "@/components/shared/FaucetWidget";
+import { GonkaConfigModal } from "@/components/shared/GonkaConfigModal";
 
 /** The frame around every signed-in page: a header, the content, and the footer note. */
 export function AppShell({
@@ -29,10 +31,14 @@ export function AppShell({
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex h-16 max-w-content items-center justify-between gap-4 px-6">
-          <Link href={home} className="text-card-title font-semibold text-ink">
-            TrustMesh
-          </Link>
           <div className="flex items-center gap-4">
+            <Link href={home} className="text-card-title font-semibold text-ink">
+              TrustMesh
+            </Link>
+            <GonkaConfigModal />
+          </div>
+          <div className="flex items-center gap-4">
+            <FaucetWidget account={account} />
             <div className="hidden text-right sm:block">
               <p className="text-small font-medium text-ink">{account.name}</p>
               <p className="text-small text-ink-soft">

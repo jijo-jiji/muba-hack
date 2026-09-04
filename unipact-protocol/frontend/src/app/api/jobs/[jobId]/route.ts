@@ -9,6 +9,7 @@ import {
   recordRelease,
   submitDeliverable,
 } from "@/lib/server/jobActions";
+import { executeReleaseMilestoneCall } from "@/lib/server/suiCli";
 import { Account, Job } from "@/lib/types";
 
 interface RouteContext {
@@ -60,13 +61,39 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     case "submit":
       result = submitDeliverable(account, job, String(body.link ?? ""), String(body.summary ?? ""));
       break;
-    case "release":
+    case "release": {
+      let digest = typeof body.digest === "string" && body.digest ? body.digest : undefined;
+      let explorerUrl = typeof body.explorerUrl === "string" && body.explorerUrl ? body.explorerUrl : undefined;
+      let note = String(body.note ?? "Payment release completed.");
+
+      // If no confirmed digest from client, execute directly on Sui Testnet
+      if (!digest && job.audit) {
+        const vaultId = job.escrowVaultId || process.env.NEXT_PUBLIC_ESCROW_VAULT_ID;
+        if (vaultId) {
+          try {
+            const onchain = await executeReleaseMilestoneCall(
+              vaultId,
+              job.audit.gonkaRequestId,
+              job.audit.truthScore
+            );
+            if (onchain.success) {
+              digest = onchain.digest;
+              explorerUrl = onchain.explorerUrl;
+              note = `Confirmed on chain on Sui Testnet: ${onchain.digest.slice(0, 12)}…`;
+            }
+          } catch (chainErr) {
+            console.warn("Server on-chain release execution note:", chainErr);
+          }
+        }
+      }
+
       result = recordRelease(account, job, {
-        digest: typeof body.digest === "string" ? body.digest : undefined,
-        explorerUrl: typeof body.explorerUrl === "string" ? body.explorerUrl : undefined,
-        note: String(body.note ?? "No detail recorded."),
+        digest,
+        explorerUrl,
+        note,
       });
       break;
+    }
     default:
       return NextResponse.json({ error: `Unknown action: ${body.action}` }, { status: 400 });
   }

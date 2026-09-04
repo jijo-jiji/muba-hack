@@ -28,8 +28,21 @@ export function JobOverview({ job }: { job: Job }) {
           <Stat label="Kind of work" value={SCOPE_LABELS[job.scope]} />
           <Stat
             label="Escrow"
-            value={job.escrowStatus === "released" ? "Released" : "Locked"}
-            note={job.escrowStatus === "released" ? undefined : "Held until the work passes"}
+            value={job.escrowStatus === "released" ? "Released" : "Locked on Sui"}
+            note={
+              job.depositExplorerUrl ? (
+                <a
+                  href={job.depositExplorerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary underline text-xs"
+                >
+                  View Sui Vault ↗
+                </a>
+              ) : (
+                "Held until the work passes"
+              )
+            }
           />
         </div>
       </CardBody>

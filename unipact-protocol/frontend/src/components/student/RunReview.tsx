@@ -23,10 +23,11 @@ export function RunReview({ job, onReviewed }: { job: Job; onReviewed: () => voi
     setIsRunning(true);
     setError(null);
     try {
+      const apiKey = localStorage.getItem("trustmesh_gonka_api_key") || undefined;
       const response = await fetch("/api/audit-milestone", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: job.id, preset }),
+        body: JSON.stringify({ jobId: job.id, preset, apiKey }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);

@@ -20,6 +20,9 @@ export const SEED_JOBS: Job[] = [
     companyId: "apex",
     companyName: "Apex Retail Solutions Sdn Bhd",
     escrowStatus: "locked",
+    escrowVaultId: "0x43d934e1075274ed5b6e0a9ec57aa03b778a86fe484fc7aae31284a8e3b6980c",
+    depositTxDigest: "EC1XXBUHaBwVpEQ1PibvECRgrvKiRNEToAZfgcDM4tUN",
+    depositExplorerUrl: "https://suiscan.xyz/testnet/tx/EC1XXBUHaBwVpEQ1PibvECRgrvKiRNEToAZfgcDM4tUN",
     status: "open",
     applications: [],
     clientAssets: [

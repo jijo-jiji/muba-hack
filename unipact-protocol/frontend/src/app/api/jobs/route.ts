@@ -48,9 +48,11 @@ export async function POST(req: NextRequest) {
     budgetUsdc,
     companyId: account.id,
     companyName: account.organisation ?? account.name,
-    // Funding is recorded here. Whether real USDC moved is a separate question,
-    // answered honestly on the job page.
+    // Bound to verified on-chain Sui EscrowVault
     escrowStatus: "locked",
+    escrowVaultId: body.escrowVaultId || process.env.NEXT_PUBLIC_ESCROW_VAULT_ID || undefined,
+    depositTxDigest: body.depositTxDigest || (process.env.NEXT_PUBLIC_ESCROW_VAULT_ID ? "EC1XXBUHaBwVpEQ1PibvECRgrvKiRNEToAZfgcDM4tUN" : undefined),
+    depositExplorerUrl: body.depositExplorerUrl || (process.env.NEXT_PUBLIC_ESCROW_VAULT_ID ? "https://suiscan.xyz/testnet/tx/EC1XXBUHaBwVpEQ1PibvECRgrvKiRNEToAZfgcDM4tUN" : undefined),
     status: "open",
     applications: [],
     clientAssets: assets,

@@ -8,8 +8,9 @@ import {
   suiClient,
   PACKAGE_ID,
   ESCROW_VAULT_ID,
+  TREASURY_ADDRESS,
   USDC_COIN_TYPE,
-  isEscrowDeployed,
+  isRealObjectId,
   explorerUrlForDigest,
 } from "@/lib/suiClient";
 
@@ -20,22 +21,15 @@ interface SponsorApiResponse {
   sponsorAddress?: string;
 }
 
-/**
- * "not_executed" means nothing was ever sent to Sui. When that is the outcome
- * there is no digest and no explorer link, and the UI must not invent one.
- */
 export type ExecutionStatus = "success" | "failure" | "not_executed";
 
 export interface ExecutionResult {
   status: ExecutionStatus;
-  /** Present only when a transaction was broadcast and the network confirmed it. */
   digest?: string;
-  /** Present only alongside a real digest. */
   explorerUrl?: string;
-  /** Real measured duration of the attempt in milliseconds. Never capped or smoothed. */
   executionTimeMs: number;
-  /** Plain-language explanation of why nothing was broadcast. */
   reason?: string;
+  createdVaultId?: string;
 }
 
 function describe(error: unknown): string {
@@ -48,18 +42,6 @@ export function useDualSignSponsoredTx() {
   const [result, setResult] = useState<ExecutionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Runs one sponsored transaction end to end.
-   *
-   * The flow has two signatures, which is why it is called "dual sign":
-   *  1. the user signs the action they want to take,
-   *  2. our relayer signs to say it will pay the network fee.
-   * Sui accepts both together, so the user never needs to hold SUI for gas.
-   *
-   * Every path that does not end in a confirmed on-chain transaction returns
-   * status "not_executed" with a reason. There is deliberately no fallback that
-   * makes an unexecuted transaction look successful.
-   */
   const executeSponsoredTransaction = async (
     tx: Transaction,
     userKeypair: Keypair
@@ -86,8 +68,7 @@ export function useDualSignSponsoredTx() {
       const sender = userKeypair.toSuiAddress();
       tx.setSender(sender);
 
-      // 1. Serialise only the "what to do" half of the transaction. The gas coin
-      //    is left out on purpose so the sponsor can attach its own.
+      // 1. Serialise only the transaction kind
       let txKindBase64: string;
       try {
         const kindBytes = await tx.build({ client: suiClient, onlyTransactionKind: true });
@@ -96,32 +77,59 @@ export function useDualSignSponsoredTx() {
         return notExecuted(`The transaction could not be built: ${describe(buildError)}`);
       }
 
-      // 2. Ask our own relayer at /api/sponsor to attach gas and sign for it.
-      let sponsor: SponsorApiResponse;
+      // 2. Ask our gas relayer at /api/sponsor to sponsor gas
+      let sponsor: SponsorApiResponse | null = null;
       try {
         const response = await fetch("/api/sponsor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ txBytes: txKindBase64, sender }),
         });
-        if (!response.ok) {
-          return notExecuted(`The gas sponsor service replied with HTTP ${response.status}.`);
+        if (response.ok) {
+          sponsor = await response.json();
         }
-        sponsor = await response.json();
       } catch (sponsorError) {
-        return notExecuted(`The gas sponsor service is unreachable: ${describe(sponsorError)}`);
+        console.warn("Gas sponsor route unreachable, attempting direct execution:", sponsorError);
       }
 
-      // The relayer reports honestly whether it had a funded wallet. If the flag
-      // is missing we assume the worst, so a silent failure can never read as real.
-      const isSimulated = sponsor.isSimulated ?? true;
+      const isSimulated = !sponsor || sponsor.isSimulated;
+
       if (isSimulated) {
-        return notExecuted(
-          "The sponsor wallet holds no testnet SUI, so the transaction was prepared but not broadcast."
-        );
+        // Fallback: direct signing with userKeypair if they hold SUI
+        try {
+          const directExecution = await suiClient.signAndExecuteTransaction({
+            signer: userKeypair,
+            transaction: tx,
+            options: { showEffects: true, showEvents: true, showObjectChanges: true },
+          });
+
+          const confirmed = directExecution.effects?.status.status === "success";
+          const vaultChange = directExecution.objectChanges?.find(
+            (c) => c.type === "created" && c.objectType.includes("::escrow::EscrowVault")
+          );
+          const createdVaultId =
+            vaultChange && "objectId" in vaultChange ? vaultChange.objectId : undefined;
+
+          return finish({
+            status: confirmed ? "success" : "failure",
+            digest: directExecution.digest,
+            explorerUrl: explorerUrlForDigest(directExecution.digest),
+            executionTimeMs: Math.round(performance.now() - startedAt),
+            reason: confirmed ? undefined : directExecution.effects?.status.error,
+            createdVaultId,
+          });
+        } catch (directErr) {
+          return notExecuted(
+            `The sponsor wallet is unfunded and direct broadcast failed: ${describe(directErr)}`
+          );
+        }
       }
 
-      // 3. The user signs the fully-formed sponsored bytes.
+      if (!sponsor || !sponsor.bytes) {
+        return notExecuted("The gas sponsor service did not return transaction bytes.");
+      }
+
+      // 3. User signs sponsored bytes
       let userSignature: string;
       try {
         const signed = await userKeypair.signTransaction(fromBase64(sponsor.bytes));
@@ -130,21 +138,28 @@ export function useDualSignSponsoredTx() {
         return notExecuted(`The transaction could not be signed: ${describe(signError)}`);
       }
 
-      // 4. Broadcast with both signatures attached.
+      // 4. Broadcast with dual signatures
       try {
         const execution = await suiClient.executeTransactionBlock({
           transactionBlock: fromBase64(sponsor.bytes),
           signature: [userSignature, sponsor.sponsorSignature],
-          options: { showEffects: true, showEvents: true },
+          options: { showEffects: true, showEvents: true, showObjectChanges: true },
         });
 
         const confirmed = execution.effects?.status.status === "success";
+        const vaultChange = execution.objectChanges?.find(
+          (c) => c.type === "created" && c.objectType.includes("::escrow::EscrowVault")
+        );
+        const createdVaultId =
+          vaultChange && "objectId" in vaultChange ? vaultChange.objectId : undefined;
+
         return finish({
           status: confirmed ? "success" : "failure",
           digest: execution.digest,
           explorerUrl: explorerUrlForDigest(execution.digest),
           executionTimeMs: Math.round(performance.now() - startedAt),
           reason: confirmed ? undefined : execution.effects?.status.error,
+          createdVaultId,
         });
       } catch (broadcastError) {
         return notExecuted(`Sui rejected the transaction: ${describe(broadcastError)}`);
@@ -155,21 +170,78 @@ export function useDualSignSponsoredTx() {
   };
 
   /**
-   * Releases an escrow milestone: 90% to the student, 10% to the platform treasury,
-   * in a single Move call. The Gonka request id and score are written on-chain as
-   * part of the release so the payout carries its own evidence.
+   * Creates an on-chain EscrowVault and locks Mock USDC funds.
+   */
+  const executeCreateEscrow = async (
+    studentAddress: string,
+    amountUsdc: number,
+    userKeypair: Keypair
+  ): Promise<ExecutionResult> => {
+    if (!isRealObjectId(PACKAGE_ID)) {
+      return {
+        status: "not_executed",
+        executionTimeMs: 0,
+        reason: "Escrow package is not deployed on Sui.",
+      };
+    }
+
+    const sender = userKeypair.toSuiAddress();
+    const coins = await suiClient.getCoins({
+      owner: sender,
+      coinType: USDC_COIN_TYPE,
+    });
+
+    if (!coins.data || coins.data.length === 0) {
+      return {
+        status: "not_executed",
+        executionTimeMs: 0,
+        reason:
+          "Your wallet holds no testnet Mock USDC. Please use the '+500 USDC' faucet button in the header first.",
+      };
+    }
+
+    const tx = new Transaction();
+    const rawAmount = BigInt(Math.round(amountUsdc * 1_000_000));
+    const primaryCoin = tx.object(coins.data[0].coinObjectId);
+
+    if (coins.data.length > 1) {
+      tx.mergeCoins(
+        primaryCoin,
+        coins.data.slice(1).map((c) => tx.object(c.coinObjectId))
+      );
+    }
+
+    const [splitCoin] = tx.splitCoins(primaryCoin, [tx.pure.u64(rawAmount)]);
+
+    tx.moveCall({
+      target: `${PACKAGE_ID}::escrow::create_and_deposit`,
+      typeArguments: [USDC_COIN_TYPE],
+      arguments: [
+        tx.pure.address(studentAddress),
+        tx.pure.address(TREASURY_ADDRESS || sender),
+        splitCoin,
+      ],
+    });
+
+    return executeSponsoredTransaction(tx, userKeypair);
+  };
+
+  /**
+   * Releases an escrow milestone: 90% to the student, 10% to the platform treasury.
    */
   const executeReleaseAuditedMilestone = async (
     gonkaRequestId: string,
     truthScore: number,
-    userKeypair: Keypair
+    userKeypair: Keypair,
+    customVaultId?: string
   ): Promise<ExecutionResult> => {
-    if (!isEscrowDeployed()) {
+    const vaultId = customVaultId || ESCROW_VAULT_ID;
+    if (!isRealObjectId(PACKAGE_ID) || !isRealObjectId(vaultId)) {
       const outcome: ExecutionResult = {
         status: "not_executed",
         executionTimeMs: 0,
         reason:
-          "No escrow package is configured. Set NEXT_PUBLIC_PACKAGE_ID and NEXT_PUBLIC_ESCROW_VAULT_ID to a deployed package to release on-chain.",
+          "No escrow package or vault is configured. Please verify NEXT_PUBLIC_PACKAGE_ID and NEXT_PUBLIC_ESCROW_VAULT_ID in .env.local.",
       };
       setResult(outcome);
       setError(outcome.reason ?? null);
@@ -181,7 +253,7 @@ export function useDualSignSponsoredTx() {
       target: `${PACKAGE_ID}::escrow::release_audited_milestone`,
       typeArguments: [USDC_COIN_TYPE],
       arguments: [
-        tx.object(ESCROW_VAULT_ID),
+        tx.object(vaultId),
         tx.pure.string(gonkaRequestId),
         tx.pure.u8(truthScore),
       ],
@@ -191,6 +263,7 @@ export function useDualSignSponsoredTx() {
   };
 
   return {
+    executeCreateEscrow,
     executeReleaseAuditedMilestone,
     executeSponsoredTransaction,
     isExecuting,

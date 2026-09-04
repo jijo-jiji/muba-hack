@@ -37,3 +37,7 @@ unipact-protocol/frontend/.trustmesh-data.json
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Local CLI tools and binaries
+tools/
+*.exe

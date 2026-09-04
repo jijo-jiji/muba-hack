@@ -15,7 +15,10 @@ export async function POST(req: NextRequest) {
   const account = readSession();
   if (!account) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const { jobId, preset } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { jobId, preset } = body;
+  const customApiKey = body.apiKey || req.headers.get("x-gonka-api-key") || undefined;
+
   const job = getJob(String(jobId ?? ""));
   if (!job) return NextResponse.json({ error: "No such job" }, { status: 404 });
 
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
   const submission = `${job.deliverable.summary}\n\nLink: ${job.deliverable.link || "(none provided)"}`;
 
   try {
-    const audit = await auditMilestoneDeliverable(brief, submission, preset);
+    const audit = await auditMilestoneDeliverable(brief, submission, preset, customApiKey);
     const saved = updateJob(job.id, (current) => ({ ...current, status: "audited", audit }));
     return NextResponse.json({ audit, job: saved });
   } catch (err) {
