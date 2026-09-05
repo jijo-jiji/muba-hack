@@ -80,8 +80,8 @@ export default function PortfolioPage({ params }: { params: { studentId: string 
                           {job.payment?.studentPayoutUsdc.toFixed(2)} USDC
                         </span>
                         {job.audit?.gonkaRequestId && (
-                          <span className="text-xs text-ink-soft bg-surface-elevated px-2 py-0.5 rounded font-mono border border-border">
-                            Proof: {job.audit.gonkaRequestId.slice(0, 16)}…
+                          <span className="rounded border border-line bg-page px-2 py-0.5 font-mono text-small text-ink-soft">
+                            Proof {job.audit.gonkaRequestId.slice(0, 16)}…
                           </span>
                         )}
                       </div>

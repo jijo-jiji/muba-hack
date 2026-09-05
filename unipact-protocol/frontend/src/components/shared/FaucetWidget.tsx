@@ -9,6 +9,7 @@ export function FaucetWidget({ account }: { account: Account }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastDigest, setLastDigest] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchBalance = async () => {
     try {
@@ -28,6 +29,7 @@ export function FaucetWidget({ account }: { account: Account }) {
   const requestFaucet = async () => {
     setLoading(true);
     setLastDigest(null);
+    setError(null);
     try {
       const res = await fetch("/api/faucet", {
         method: "POST",
@@ -39,29 +41,34 @@ export function FaucetWidget({ account }: { account: Account }) {
       if (data.digest) setLastDigest(data.digest);
       await fetchBalance();
     } catch (err) {
-      console.warn("Faucet request failed:", err);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="rounded-full border border-border bg-surface-elevated px-3 py-1 text-xs font-medium text-ink flex items-center gap-1.5">
-        <span className="text-ink-soft">Testnet USDC:</span>
-        <span className="font-semibold text-ink">
-          {balance !== null ? balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "…"}
+    <div className="relative flex items-center gap-3">
+      <p className="hidden text-small text-ink-soft sm:block">
+        <span className="text-ink-faint">USDC</span>{" "}
+        <span className="font-mono text-ink">
+          {balance !== null
+            ? balance.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+            : "—"}
         </span>
-      </div>
+      </p>
 
       <Button
         variant="secondary"
         size="sm"
         onClick={requestFaucet}
         disabled={loading}
-        title="Mint 500 Testnet Mock USDC on Sui"
+        title="Add 500 testnet USDC to your wallet"
       >
-        {loading ? "Minting…" : "+500 USDC"}
+        {loading ? "Adding…" : "Add 500"}
       </Button>
 
       {lastDigest && (
@@ -69,10 +76,18 @@ export function FaucetWidget({ account }: { account: Account }) {
           href={explorerUrlForDigest(lastDigest)}
           target="_blank"
           rel="noreferrer"
-          className="text-xs text-primary underline hidden md:inline"
+          className="hidden text-small text-accent hover:underline md:inline"
         >
-          View Tx
+          View
         </a>
+      )}
+
+      {/* The old widget logged failures to the console only, so a click that did
+          nothing looked like a click that worked. */}
+      {error && (
+        <p className="absolute right-0 top-full z-10 mt-2 max-w-xs rounded border border-danger/30 bg-surface px-3 py-2 text-small text-danger shadow-subtle">
+          {error}
+        </p>
       )}
     </div>
   );

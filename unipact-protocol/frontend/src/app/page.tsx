@@ -32,9 +32,8 @@ export default function LandingPage() {
         <div className="mx-auto flex h-16 max-w-content items-center justify-between px-6">
           <span className="text-card-title font-semibold text-ink">TrustMesh</span>
           <nav className="flex items-center gap-6">
-            <Link href="/verify" className="flex items-center gap-1 text-small font-medium text-accent hover:underline">
-              <span>🔍</span>
-              <span>Gonka AI Verifier</span>
+            <Link href="/verify" className="hidden text-body text-ink-soft hover:text-ink sm:block">
+              Check a claim
             </Link>
             <Link href="/login" className="hidden text-body text-ink-soft hover:text-ink sm:block">
               For companies
@@ -65,9 +64,6 @@ export default function LandingPage() {
             </ButtonLink>
             <ButtonLink href="/login" size="lg" variant="secondary">
               I&rsquo;m a student
-            </ButtonLink>
-            <ButtonLink href="/verify" size="lg" variant="secondary">
-              Try AI Verifier
             </ButtonLink>
           </div>
         </section>
