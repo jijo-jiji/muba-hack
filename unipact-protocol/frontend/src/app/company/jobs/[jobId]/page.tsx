@@ -5,6 +5,7 @@ import { useJob } from "@/hooks/useJobs";
 import { useAccount } from "@/components/shared/SessionProvider";
 import { canAcceptApplicant, canReleasePayment, canViewAudit } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { BackLink } from "@/components/ui/BackLink";
 import { JobStatusBadge } from "@/components/shared/JobStatusBadge";
 import { JobOverview } from "@/components/shared/JobOverview";
 import { ClientAssets } from "@/components/shared/ClientAssets";
@@ -35,9 +36,7 @@ export default function CompanyJobPage({ params }: { params: { jobId: string } }
 
   return (
     <div className="space-y-8">
-      <Link href="/company" className="text-small text-ink-soft hover:text-ink">
-        ← Your jobs
-      </Link>
+      <BackLink href="/company">Your jobs</BackLink>
 
       <PageHeader title={job.title} action={<JobStatusBadge status={job.status} />} />
 

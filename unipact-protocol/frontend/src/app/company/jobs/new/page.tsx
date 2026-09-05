@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { BackLink } from "@/components/ui/BackLink";
 import { Card, CardBody, CardFooter } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
@@ -53,6 +54,8 @@ export default function NewJobPage() {
 
   return (
     <div className="max-w-2xl space-y-8">
+      <BackLink href="/company">Your jobs</BackLink>
+
       <PageHeader
         title="Post a job"
         description="The budget is locked when you post. It is released only after the work has been checked."

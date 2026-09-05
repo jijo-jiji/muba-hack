@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Card, CardBody, CardHeader, CardTitle, CardFooter } from "@/components/ui/Card";
+import { CardBody, CardFooter } from "@/components/ui/Card";
 import { Field, Input } from "@/components/ui/Field";
+import { Modal } from "@/components/ui/Modal";
 
 export function GonkaConfigModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -71,109 +72,96 @@ export function GonkaConfigModal() {
     setIsOpen(false);
   };
 
+  const isLive = status === "connected";
+
   return (
     <>
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-2 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-surface-elevated"
-        title="Gonka AI Router Configuration"
+        title="AI review settings"
+        className="inline-flex items-center gap-2 rounded border border-line px-2.5 py-1 text-small text-ink-soft transition-colors hover:border-line-strong hover:text-ink"
       >
-        <span
-          className={`h-2 w-2 rounded-full ${
-            status === "connected" ? "bg-emerald-500" : "bg-amber-500"
-          }`}
-        />
-        <span>{status === "connected" ? "Gonka AI: Live" : "Gonka AI: Demo Preset"}</span>
+        <span className={`h-1.5 w-1.5 rounded-full ${isLive ? "bg-success" : "bg-warning"}`} />
+        <span>{isLive ? "AI review: live" : "AI review: demo data"}</span>
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Gonka AI Configuration</CardTitle>
-                  <button
-                    onClick={() => setIsOpen(false)}
-                    className="text-ink-soft hover:text-ink text-sm font-medium"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </CardHeader>
-              <CardBody className="space-y-4">
-                <p className="text-body text-ink-soft">
-                  TrustMesh uses <strong>Gonka Router (gonkarouter.io)</strong> for dual-model forensic auditing of deliverables.
+        <Modal title="AI review settings" onClose={() => setIsOpen(false)}>
+          <CardBody className="space-y-6">
+            <p className="text-body text-ink-soft">
+              Reviews run through Gonka Router. Without a key the app returns canned results, and
+              every screen that shows one labels it as demo data.
+            </p>
+
+            <dl className="space-y-2 rounded border border-line bg-page px-4 py-3">
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-small text-ink-soft">Endpoint</dt>
+                <dd className="font-mono text-small text-ink">api.gonkarouter.io/v1</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-small text-ink-soft">Models</dt>
+                <dd className="font-mono text-small text-ink">Kimi-K2.6, DeepSeek-V4</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-small text-ink-soft">Status</dt>
+                <dd className={`text-small font-medium ${isLive ? "text-success" : "text-warning"}`}>
+                  {isLive ? "Live" : "Falling back to demo data"}
+                </dd>
+              </div>
+            </dl>
+
+            <Field
+              label="Gonka Router API key"
+              htmlFor="gonka-key"
+              hint="Stored in this browser only. It is sent to our server to make the call, never to anyone else."
+            >
+              <Input
+                id="gonka-key"
+                type="password"
+                placeholder="sk-..."
+                value={key}
+                onChange={(event) => setKey(event.target.value)}
+              />
+            </Field>
+
+            {testResult && (
+              <div
+                className={`rounded border px-4 py-3 ${
+                  testResult.ok ? "border-success/30 bg-success/5" : "border-danger/30 bg-danger/5"
+                }`}
+              >
+                <p
+                  className={`text-small font-medium ${
+                    testResult.ok ? "text-success" : "text-danger"
+                  }`}
+                >
+                  {testResult.ok ? "Connected" : "Could not connect"}
                 </p>
-
-                <div className="rounded-lg border border-border bg-surface-elevated p-3 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-ink-soft">Endpoint:</span>
-                    <code className="text-ink font-mono">api.gonkarouter.io/v1</code>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ink-soft">Model:</span>
-                    <code className="text-ink font-mono">moonshotai/Kimi-K2.6</code>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ink-soft">Status:</span>
-                    <span className={`font-semibold ${status === "connected" ? "text-emerald-600" : "text-amber-600"}`}>
-                      {status === "connected" ? "Live API Verified" : "Fallback / Demo Presets"}
-                    </span>
-                  </div>
-                </div>
-
-                <Field
-                  label="Gonka Router API Key"
-                  htmlFor="gonka-key"
-                  hint="Enter your key to test live dual-model evaluation."
-                >
-                  <Input
-                    id="gonka-key"
-                    type="password"
-                    placeholder="sk-..."
-                    value={key}
-                    onChange={(e) => setKey(e.target.value)}
-                  />
-                </Field>
-
-                {testResult && (
-                  <div
-                    className={`rounded-md p-3 text-xs ${
-                      testResult.ok
-                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                        : "bg-red-50 text-red-800 border border-red-200"
-                    }`}
-                  >
-                    <p className="font-semibold">{testResult.ok ? "Success" : "Error"}</p>
-                    <p>{testResult.message}</p>
-                    {testResult.latencyMs !== undefined && testResult.latencyMs > 0 && (
-                      <p className="mt-1 text-[10px] opacity-75">Roundtrip: {testResult.latencyMs}ms</p>
-                    )}
-                  </div>
+                <p className="mt-1 text-small text-ink-soft">{testResult.message}</p>
+                {testResult.latencyMs !== undefined && testResult.latencyMs > 0 && (
+                  <p className="mt-1 text-small text-ink-faint">
+                    Round trip {testResult.latencyMs} ms
+                  </p>
                 )}
-              </CardBody>
-              <CardFooter className="flex justify-between gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleTest}
-                  disabled={testing}
-                >
-                  {testing ? "Testing…" : "Test Key"}
-                </Button>
-                <div className="flex gap-2">
-                  <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>
-                    Close
-                  </Button>
-                  <Button type="button" onClick={handleSave}>
-                    Save
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
-          </div>
-        </div>
+              </div>
+            )}
+          </CardBody>
+
+          <CardFooter className="flex flex-wrap items-center justify-between gap-3">
+            <Button type="button" variant="secondary" onClick={handleTest} disabled={testing}>
+              {testing ? "Testing…" : "Test key"}
+            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleSave}>
+                Save
+              </Button>
+            </div>
+          </CardFooter>
+        </Modal>
       )}
     </>
   );

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { listJobs } from "@/lib/server/jobStore";
 import { TREASURY_ADDRESS, isRealAddress } from "@/lib/suiClient";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -109,9 +108,6 @@ export default function AdminDashboard() {
             university verification, and dispute resolution. None of those are implemented, and
             there is no data behind them, so they are named here rather than mocked up.
           </p>
-          <Link href="/" className="mt-4 inline-block text-small text-accent hover:underline">
-            Back to the landing page
-          </Link>
         </CardBody>
       </Card>
     </div>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { findAccount } from "@/lib/zklogin";
 import { listJobs } from "@/lib/server/jobStore";
@@ -8,6 +7,7 @@ import { Avatar } from "@/components/ui/PageHeader";
 import { AddressChip } from "@/components/ui/AddressChip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Stat } from "@/components/ui/Stat";
+import { BackToDashboard } from "@/components/shared/BackToDashboard";
 
 /**
  * A student's public record. Anyone with the link can open it, signed in or not,
@@ -25,12 +25,10 @@ export default function PortfolioPage({ params }: { params: { studentId: string 
   const earned = completed.reduce((total, job) => total + (job.payment?.studentPayoutUsdc ?? 0), 0);
 
   return (
-    <div className="mx-auto max-w-content px-6 py-16">
-      <Link href="/" className="text-card-title font-semibold text-ink">
-        TrustMesh
-      </Link>
+    <div>
+      <BackToDashboard />
 
-      <header className="mt-12 flex items-center gap-4">
+      <header className="mt-8 flex items-center gap-4">
         <Avatar name={student.name} className="h-12 w-12 text-body" />
         <div>
           <h1 className="text-page-title font-semibold">{student.name}</h1>
@@ -80,8 +78,8 @@ export default function PortfolioPage({ params }: { params: { studentId: string 
                           {job.payment?.studentPayoutUsdc.toFixed(2)} USDC
                         </span>
                         {job.audit?.gonkaRequestId && (
-                          <span className="text-xs text-ink-soft bg-surface-elevated px-2 py-0.5 rounded font-mono border border-border">
-                            Proof: {job.audit.gonkaRequestId.slice(0, 16)}…
+                          <span className="rounded border border-line bg-page px-2 py-0.5 font-mono text-small text-ink-soft">
+                            Proof {job.audit.gonkaRequestId.slice(0, 16)}…
                           </span>
                         )}
                       </div>
@@ -108,9 +106,6 @@ export default function PortfolioPage({ params }: { params: { studentId: string 
         )}
       </div>
 
-      <p className="mt-16 border-t border-line pt-6 text-small text-ink-soft">
-        Demo authentication. Production would verify the zkLogin JWT server-side.
-      </p>
     </div>
   );
 }

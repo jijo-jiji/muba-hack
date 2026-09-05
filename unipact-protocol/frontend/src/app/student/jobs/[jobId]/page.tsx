@@ -11,6 +11,7 @@ import {
   canViewAudit,
 } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { BackLink } from "@/components/ui/BackLink";
 import { JobStatusBadge } from "@/components/shared/JobStatusBadge";
 import { JobOverview } from "@/components/shared/JobOverview";
 import { ClientAssets } from "@/components/shared/ClientAssets";
@@ -45,9 +46,7 @@ export default function StudentJobPage({ params }: { params: { jobId: string } }
 
   return (
     <div className="space-y-8">
-      <Link href="/student" className="text-small text-ink-soft hover:text-ink">
-        ← Your dashboard
-      </Link>
+      <BackLink href="/student">Your dashboard</BackLink>
 
       <PageHeader
         title={job.title}
