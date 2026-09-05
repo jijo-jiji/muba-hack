@@ -6,6 +6,7 @@ import { AddressChip } from "@/components/ui/AddressChip";
 import { Meter } from "@/components/ui/Meter";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { ModelSteps } from "@/components/shared/ModelSteps";
+import { GonkaNetworkLog } from "@/components/shared/GonkaNetworkLog";
 
 /**
  * The result of the AI review.
@@ -81,6 +82,8 @@ export function AuditReport({ audit }: { audit: MilestoneAuditResult }) {
             </ul>
           </div>
         )}
+
+        <GonkaNetworkLog audit={audit} />
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
           <AddressChip label="Gonka request ID" value={audit.gonkaRequestId} />
