@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Account } from "@/lib/types";
-import { getMockUsdcBalance, explorerUrlForDigest } from "@/lib/suiClient";
+import { explorerUrlForDigest } from "@/lib/suiClient";
 import { Button } from "@/components/ui/Button";
 
 export function FaucetWidget({ account }: { account: Account }) {
@@ -10,13 +10,25 @@ export function FaucetWidget({ account }: { account: Account }) {
   const [loading, setLoading] = useState(false);
   const [lastDigest, setLastDigest] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
 
+  // Read through our own server. The browser cannot query Sui directly any more:
+  // @mysten/sui uses JSON-RPC, which public testnet fullnodes have switched off.
   const fetchBalance = async () => {
     try {
-      const b = await getMockUsdcBalance(account.address);
-      setBalance(b);
-    } catch {
-      // ignore
+      const res = await fetch(
+        `/api/balance?address=${encodeURIComponent(account.address)}`,
+        { cache: "no-store" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setBalance(data.balance);
+      setBalanceError(null);
+    } catch (err) {
+      // Leave the balance unknown rather than showing 0.00, which would be
+      // indistinguishable from an address that genuinely holds nothing.
+      setBalance(null);
+      setBalanceError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -49,7 +61,7 @@ export function FaucetWidget({ account }: { account: Account }) {
 
   return (
     <div className="relative flex items-center gap-3">
-      <p className="hidden text-small text-ink-soft sm:block">
+      <p className="hidden text-small text-ink-soft sm:block" title={balanceError ?? undefined}>
         <span className="text-ink-faint">USDC</span>{" "}
         <span className="font-mono text-ink">
           {balance !== null
