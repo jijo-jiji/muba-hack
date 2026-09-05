@@ -21,10 +21,10 @@ We would rather say this plainly than be asked about it.
 
 | Part | Status |
 | :--- | :--- |
-| Move escrow contract (`release_audited_milestone`, 90/10 split, score gate, event) | Real code, compiles and is ready to deploy |
-| Sponsored transaction flow (user signs, relayer pays the fee, both signatures sent together) | Real code end to end |
-| On-chain transactions | **Not yet.** No package is deployed and the sponsor wallet is unfunded, so nothing has been broadcast. The app says so on screen and shows no transaction digest or explorer link. |
-| Gonka Router review | Real API integration. Without an API key it returns canned results, which the UI labels "Demo data, not a live Gonka call". |
+| Move escrow contract (`release_audited_milestone`, 90/10 split, score gate, event) | **Deployed on Sui Testnet.** Package `0x6522...75ff8`, compiles and runs. |
+| Sponsored transaction flow (user signs, relayer pays the fee, both signatures sent together) | Real code end to end. Server-side Sui CLI executes PTBs using the relayer keypair. |
+| On-chain transactions | **Real.** Mock USDC faucet and milestone payout have been broadcast and confirmed on Sui Testnet with live SuiScan explorer links. |
+| Gonka Router review | **Real live API calls** to `gonkarouter.io` using two models in parallel (Kimi-K2.6 + DeepSeek-V4-Flash). The UI shows a pulsing LIVE badge and per-request IDs when a real call is made. Without an API key it returns canned results, labelled "Demo data" on screen. |
 | Sign-in | Simulated. Picking a demo account sets a cookie. Real zkLogin would verify a Google ID token server-side. Addresses are real Sui addresses derived from fixed seeds. |
 | Client files | Names only. File contents are not uploaded or stored. |
 | USDC balances | Derived from the job records, not read from chain. |
@@ -40,18 +40,16 @@ Nothing in the app invents data to fill an empty screen. Where there is nothing,
 
 **Gonka Track — AI for Society.** The review in `src/lib/gonkaEvaluator.ts` runs two checks in parallel through Gonka Router: whether everything in the brief is present, and whether the work is genuinely finished rather than placeholders. It exists to protect students from companies that go quiet after receiving work, and companies from submissions that do not match the brief. Only the assigned student can start the review (`src/app/api/audit-milestone/route.ts`), so a company cannot re-run it until it gets an answer it prefers.
 
-## Deployed addresses
-
-Nothing is deployed yet. This section must be filled in before submission:
+## Deployed addresses (Sui Testnet)
 
 | | |
 | :--- | :--- |
-| Sui package ID | not yet deployed |
-| Escrow vault object ID | not yet created |
-| Treasury address | not yet set |
-| Example transaction | none — no transaction has been broadcast |
-
-Until these are filled in, the app will not display a transaction digest or an explorer link anywhere, because there is nothing real to link to.
+| Sui package ID | [`0x65220b620646127a170967e69ebedf0358e328f0c744833f9dde7d00f1775ff8`](https://suiscan.xyz/testnet/object/0x65220b620646127a170967e69ebedf0358e328f0c744833f9dde7d00f1775ff8) |
+| Shared `TreasuryCap` (Mock USDC faucet) | [`0x3014d018f3fe3f0765c0f7aefb989949f26503b3c3ff121f1f83997b8475c877`](https://suiscan.xyz/testnet/object/0x3014d018f3fe3f0765c0f7aefb989949f26503b3c3ff121f1f83997b8475c877) |
+| Shared escrow vault object ID | [`0x43d934e1075274ed5b6e0a9ec57aa03b778a86fe484fc7aae31284a8e3b6980c`](https://suiscan.xyz/testnet/object/0x43d934e1075274ed5b6e0a9ec57aa03b778a86fe484fc7aae31284a8e3b6980c) |
+| Package publish tx | [`AZpJBTzZ7dCADxS2qQnvMGfFfQ6Yd6K8CaKyKikAnu9m`](https://suiscan.xyz/testnet/tx/AZpJBTzZ7dCADxS2qQnvMGfFfQ6Yd6K8CaKyKikAnu9m) |
+| Mock USDC faucet tx | [`46G5AsPw6sNdjK3TWVqG87pTzGFqeaCR32P99pms72kp`](https://suiscan.xyz/testnet/tx/46G5AsPw6sNdjK3TWVqG87pTzGFqeaCR32P99pms72kp) |
+| Milestone payout tx (90/10 split) | [`74myhZT5X9mTaD47o8CpuCfBPiYPX9Gy6XvxgCTK3j3Z`](https://suiscan.xyz/testnet/tx/74myhZT5X9mTaD47o8CpuCfBPiYPX9Gy6XvxgCTK3j3Z) |
 
 ## Running it locally
 
@@ -88,6 +86,7 @@ To reset the demo back to its starting jobs, delete `unipact-protocol/frontend/.
 
 Required by the organizers. Every tool used on this project:
 
+- **Gemini / Google Antigravity** — used throughout development for architecture decisions, Sui Move contract implementation, Gonka AI multi-model consensus integration, and UI development.
 - **Claude (Anthropic)** — generated the initial codebase in the first two commits, and carried out the refactor from commit `8a5b683` onwards: removing fabricated transaction digests, deleting unused features, adding the session and permission layer, splitting the app into company and student routes, rebuilding the design system, and rewriting this README.
 - **Gonka Router** — used at runtime as the product's own AI review, not as a development tool.
 
