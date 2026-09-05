@@ -41,9 +41,21 @@ export function explorerUrlForObject(objectId: string): string {
 
 /**
  * Reads the live on-chain MOCK_USDC balance for any address.
+ * Routes through the server (/api/balance) in the browser to avoid public JSON-RPC deprecation.
  */
 export async function getMockUsdcBalance(address: string): Promise<number> {
   if (!isRealAddress(address) || !isRealObjectId(PACKAGE_ID)) return 0;
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch(`/api/balance?address=${encodeURIComponent(address)}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.balance === "number") return data.balance;
+      }
+    } catch (err) {
+      console.warn("Could not query USDC balance via /api/balance:", err);
+    }
+  }
   try {
     const coins = await suiClient.getCoins({
       owner: address,

@@ -79,6 +79,82 @@ function parseCliJson(stdout: string): CliCallResult {
   return { digest: parsed.digest, effects: parsed.effects };
 }
 
+function matchesCoinType(a: string, b: string): boolean {
+  if (a.toLowerCase() === b.toLowerCase()) return true;
+  const partsA = a.split("::");
+  const partsB = b.split("::");
+  if (partsA.length === 3 && partsB.length === 3) {
+    const sameModule = partsA[1].toLowerCase() === partsB[1].toLowerCase();
+    const sameStruct = partsA[2].toLowerCase() === partsB[2].toLowerCase();
+    try {
+      const addrA = BigInt(partsA[0]);
+      const addrB = BigInt(partsB[0]);
+      return sameModule && sameStruct && addrA === addrB;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+const balanceCache = new Map<string, { balance: number; timestamp: number }>();
+const inFlightBalance = new Map<string, Promise<number>>();
+const CACHE_TTL_MS = 4000;
+
+/**
+ * Reads an address's balance of one coin type through the CLI.
+ *
+ * The browser cannot do this any more: @mysten/sui talks JSON-RPC to the public
+ * fullnode, and testnet fullnodes have turned JSON-RPC off. The CLI uses a
+ * transport that still works, so balance reads go through the server.
+ *
+ * Returns the amount in whole coins. Throws rather than returning 0 on failure,
+ * because a zero balance and an unreachable network must not look the same.
+ */
+export async function getCoinBalanceViaCli(address: string, coinType: string): Promise<number> {
+  const cacheKey = `${address.toLowerCase()}::${coinType.toLowerCase()}`;
+  const now = Date.now();
+  const cached = balanceCache.get(cacheKey);
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+    return cached.balance;
+  }
+
+  const existingPromise = inFlightBalance.get(cacheKey);
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      const stdout = await runSui(["client", "balance", address, "--json"]);
+      const start = stdout.indexOf("[");
+      if (start === -1) throw new Error("The Sui CLI returned no balance data.");
+
+      const parsed = JSON.parse(stdout.substring(start)) as unknown;
+      // Shape: [ [ { balance: { coinType, balance } } ], hasMore ]
+      const groups = Array.isArray(parsed) && Array.isArray(parsed[0]) ? parsed[0] : [];
+
+      for (const entry of groups) {
+        const balance = (entry as { balance?: { coinType?: string; balance?: string } })?.balance;
+        if (balance?.coinType && typeof balance.balance === "string") {
+          if (matchesCoinType(balance.coinType, coinType)) {
+            const val = Number(BigInt(balance.balance)) / 1_000_000;
+            balanceCache.set(cacheKey, { balance: val, timestamp: Date.now() });
+            return val;
+          }
+        }
+      }
+      balanceCache.set(cacheKey, { balance: 0, timestamp: Date.now() });
+      return 0; // The address genuinely holds none of this coin.
+    } finally {
+      inFlightBalance.delete(cacheKey);
+    }
+  })();
+
+  inFlightBalance.set(cacheKey, fetchPromise);
+  return fetchPromise;
+}
+
 export async function executeFaucetCall(recipient: string, amountUsdc: number = 500): Promise<{
   success: boolean;
   digest: string;
@@ -104,6 +180,13 @@ export async function executeFaucetCall(recipient: string, amountUsdc: number = 
   ];
 
   const result = parseCliJson(await runSui(args));
+
+  // Invalidate any cached balance for this recipient so fresh reads see the minted coins
+  balanceCache.forEach((_, key) => {
+    if (key.startsWith(recipient.toLowerCase())) {
+      balanceCache.delete(key);
+    }
+  });
 
   return {
     success: result.effects?.status?.status === "success",
