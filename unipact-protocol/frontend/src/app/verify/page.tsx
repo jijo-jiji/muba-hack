@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ClaimVerificationResult } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardFooter } from "@/components/ui/Card";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Field, Textarea } from "@/components/ui/Field";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { VerificationReport } from "@/components/shared/VerificationReport";
+import { BackToDashboard } from "@/components/shared/BackToDashboard";
 
 const SAMPLES = [
   {
@@ -84,12 +84,10 @@ export default function VerifyPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-content px-6 py-12">
-      <Link href="/" className="text-small text-ink-soft hover:text-ink">
-        &larr; TrustMesh
-      </Link>
+    <div className="space-y-8">
+      <BackToDashboard />
 
-      <div className="mt-8 max-w-3xl space-y-8">
+      <div className="max-w-3xl space-y-8">
         <PageHeader
           title="Check a claim"
           description="Paste a link or a piece of text and two independent models will judge it against a reference. This is the same review that decides whether a job's escrow pays out."
