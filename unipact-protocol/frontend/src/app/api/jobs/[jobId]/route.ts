@@ -64,12 +64,15 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     case "release": {
       let digest = typeof body.digest === "string" && body.digest ? body.digest : undefined;
       let explorerUrl = typeof body.explorerUrl === "string" && body.explorerUrl ? body.explorerUrl : undefined;
-      let note = String(body.note ?? "Payment release completed.");
+      let note = digest ? String(body.note ?? "Confirmed on chain.") : "";
 
-      // If no confirmed digest from client, execute directly on Sui Testnet
+      // The browser cannot reach Sui directly (public fullnodes dropped JSON-RPC),
+      // so when it comes back without a digest we run the release here instead.
       if (!digest && job.audit) {
         const vaultId = job.escrowVaultId || process.env.NEXT_PUBLIC_ESCROW_VAULT_ID;
-        if (vaultId) {
+        if (!vaultId) {
+          note = "No escrow vault is configured for this job, so nothing was submitted on chain.";
+        } else {
           try {
             const onchain = await executeReleaseMilestoneCall(
               vaultId,
@@ -79,13 +82,20 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
             if (onchain.success) {
               digest = onchain.digest;
               explorerUrl = onchain.explorerUrl;
-              note = `Confirmed on chain on Sui Testnet: ${onchain.digest.slice(0, 12)}…`;
+              note = `Confirmed on chain in transaction ${onchain.digest}.`;
+            } else {
+              note = "Sui accepted the transaction but reported it as failed.";
             }
           } catch (chainErr) {
-            console.warn("Server on-chain release execution note:", chainErr);
+            // Never let a failed release read as a completed one.
+            const reason = chainErr instanceof Error ? chainErr.message : String(chainErr);
+            console.warn("On-chain release failed:", reason);
+            note = `Not submitted on chain: ${reason}`;
           }
         }
       }
+
+      if (!note) note = "No on-chain transaction was submitted.";
 
       result = recordRelease(account, job, {
         digest,
